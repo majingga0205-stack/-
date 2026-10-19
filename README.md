@@ -8,13 +8,13 @@
 
 **정적 호스팅:** 공개 폴더에 `dist/index.html` 하나를 업로드하세요. Netlify·Cloudflare Pages 등에서 빌드를 설정한다면 명령은 `npm run build`, 게시 디렉터리는 `dist`입니다.
 
-**GitHub Pages:** 아래 명령은 최신 단일 HTML과 `.nojekyll`만 `origin`의 `gh-pages` 브랜치에 업로드합니다. 현재 브랜치, 작업 파일, Git 스테이징 영역은 유지하며 강제 푸시하지 않습니다. GitHub 저장소 쓰기 권한이 필요합니다.
+**GitHub Pages:** 이 저장소의 기존 Pages 게시 브랜치는 `master`입니다. 아래 명령은 최신 단일 HTML과 `.nojekyll`을 `origin/master`에 업로드합니다. 게시 브랜치의 다른 파일, 현재 개발 브랜치, 작업 파일과 Git 스테이징 영역은 유지하며 강제 푸시하지 않습니다. GitHub 저장소 쓰기 권한이 필요합니다.
 
 ```sh
 npm run deploy
 ```
 
-최초 한 번 [저장소 Pages 설정](https://github.com/majingga0205-stack/-/settings/pages)에서 **Deploy from a branch → gh-pages → / (root) → Save**를 선택합니다. 배포 완료 후 게임 주소는 `https://majingga0205-stack.github.io/-/`입니다. 브랜치 업로드와 Pages 활성화·게시 완료는 별도 단계입니다. 이후 `npm run deploy`로 갱신할 수 있습니다.
+게임 주소는 `https://majingga0205-stack.github.io/-/`입니다. 기존 Pages 설정을 유지하고 [배포 실행 결과](https://github.com/majingga0205-stack/-/actions)에서 게시 완료를 확인합니다. 다른 저장소로 옮길 경우 [Pages 설정](https://github.com/majingga0205-stack/-/settings/pages)에서 **Deploy from a branch → master → / (root)**를 지정합니다. 다른 게시 브랜치를 사용하려면 `npm run deploy -- gh-pages`처럼 전달할 수 있습니다. 브랜치 업로드와 실제 게시 완료는 별도 단계입니다.
 
 소스를 수정한 뒤 아래 명령으로 단일 파일을 다시 만들 수 있습니다. Node.js만 필요하며 `npm install`은 필요하지 않습니다.
 
