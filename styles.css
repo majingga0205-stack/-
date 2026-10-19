@@ -14,3 +14,21 @@
 @media(max-width:1000px){.hud-bottom{bottom:1%}.slow-label{font-size:8px}.slow-label small{font-size:7px}.slow-track{margin:4px 0 5px}.ability-bottom{font-size:8px}.weapon-label{font-size:9px}.ammo-line>strong{font-size:25px}.ammo-line>span{font-size:9px}.weapon-bottom{font-size:7px}.story-caption{font-size:10px}}
 @media(max-width:560px){.ammo-line>strong{font-size:22px}.weapon-bottom{font-size:6px;gap:1px}.ability-bottom{font-size:6px}.story-caption{font-size:8px;max-width:75%}.arsenal-heading{font-size:10px}.arsenal-heading>span{font-size:8px}}
 @media(max-height:760px) and (min-width:1000px){.panel-header{padding:18px 26px 15px}.panel-header h2{margin-top:8px}.panel-body{padding:15px 26px}.panel-footer{padding:7px 26px}.setting-row{margin-bottom:12px}.setting-row>p{margin:5px 0 7px}.setting-row:last-of-type{margin-bottom:12px}.settings-bottom{padding-top:9px}.panel-footer .text-button{padding:6px 0}}
+
+/* Pixel noir: hard art pixels, square UI accents, readable Korean typography. */
+#game-canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+.game-stage{border-color:#53616b;box-shadow:4px 4px 0 #080d14,8px 8px 0 #252c33}
+.vignette,.game-stage[data-mode="playing"] .vignette{box-shadow:none}
+h1,h2{font-family:var(--sans);font-weight:900;text-shadow:4px 4px 0 #16232f;letter-spacing:-.06em}
+h1 em{color:#e9dbb5}
+.edition{color:#d1b978}
+.edition>span,.live-dot{border-radius:0;box-shadow:2px 2px 0 #060b12}
+.primary-button{border:2px solid #da7864;box-shadow:4px 4px 0 #4b272b;transition:background .12s,transform .12s}
+.primary-button:hover{box-shadow:4px 4px 0 #4b272b;background:#bf5348;transform:translate(-1px,-1px)}
+.primary-button:active{transform:translate(3px,3px);box-shadow:1px 1px 0 #4b272b}
+.screen-overlay{backdrop-filter:none;background:rgba(9,15,23,.89)}
+.reward-card{background:#202d30;border:2px solid #52635d;box-shadow:4px 4px 0 #080f16}
+.reward-card:hover,.reward-card:focus-visible{background:#2c3936;border-color:#cfb67d;transform:translateY(-4px)}
+.panel-dialog{background:#17232a;border:2px solid #596c70;box-shadow:6px 6px 0 #080d14}
+kbd{border-radius:0;box-shadow:1px 1px 0 #070d12}
+.health-track,.slow-track,.reload-track{border-radius:0}

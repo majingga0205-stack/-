@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101316">
-  <meta name="description" content="새벽 전 마지막 탄환 — 비 내리는 범죄도시를 가로지르는 누아르 로그라이크 총격 액션.">
+  <meta name="description" content="새벽 전 마지막 탄환 — 비 내리는 범죄도시를 가로지르는 픽셀 누아르 로그라이크 총격 액션.">
   <title>새벽 전 마지막 탄환</title>
   <style>
 :root{color-scheme:dark;--bg:#101315;--panel:#171b1e;--line:rgba(220,219,206,.14);--ink:#eeebe2;--muted:#90938e;--red:#bf4438;--red-light:#de5a49;--gold:#c5a568;--mono:"Courier New",monospace;--sans:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",Arial,sans-serif;--serif:"Noto Serif KR","Nanum Myeongjo",Batang,Georgia,serif}
@@ -24,6 +24,24 @@
 @media(max-width:560px){.ammo-line>strong{font-size:22px}.weapon-bottom{font-size:6px;gap:1px}.ability-bottom{font-size:6px}.story-caption{font-size:8px;max-width:75%}.arsenal-heading{font-size:10px}.arsenal-heading>span{font-size:8px}}
 @media(max-height:760px) and (min-width:1000px){.panel-header{padding:18px 26px 15px}.panel-header h2{margin-top:8px}.panel-body{padding:15px 26px}.panel-footer{padding:7px 26px}.setting-row{margin-bottom:12px}.setting-row>p{margin:5px 0 7px}.setting-row:last-of-type{margin-bottom:12px}.settings-bottom{padding-top:9px}.panel-footer .text-button{padding:6px 0}}
 
+/* Pixel noir: hard art pixels, square UI accents, readable Korean typography. */
+#game-canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+.game-stage{border-color:#53616b;box-shadow:4px 4px 0 #080d14,8px 8px 0 #252c33}
+.vignette,.game-stage[data-mode="playing"] .vignette{box-shadow:none}
+h1,h2{font-family:var(--sans);font-weight:900;text-shadow:4px 4px 0 #16232f;letter-spacing:-.06em}
+h1 em{color:#e9dbb5}
+.edition{color:#d1b978}
+.edition>span,.live-dot{border-radius:0;box-shadow:2px 2px 0 #060b12}
+.primary-button{border:2px solid #da7864;box-shadow:4px 4px 0 #4b272b;transition:background .12s,transform .12s}
+.primary-button:hover{box-shadow:4px 4px 0 #4b272b;background:#bf5348;transform:translate(-1px,-1px)}
+.primary-button:active{transform:translate(3px,3px);box-shadow:1px 1px 0 #4b272b}
+.screen-overlay{backdrop-filter:none;background:rgba(9,15,23,.89)}
+.reward-card{background:#202d30;border:2px solid #52635d;box-shadow:4px 4px 0 #080f16}
+.reward-card:hover,.reward-card:focus-visible{background:#2c3936;border-color:#cfb67d;transform:translateY(-4px)}
+.panel-dialog{background:#17232a;border:2px solid #596c70;box-shadow:6px 6px 0 #080d14}
+kbd{border-radius:0;box-shadow:1px 1px 0 #070d12}
+.health-track,.slow-track,.reload-track{border-radius:0}
+
 </style>
 </head>
 <body>
@@ -33,7 +51,7 @@
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>LAST BULLET<span class="brand-sub">BEFORE DAWN</span></span>
       </a>
-      <div class="header-center"><span class="live-dot"></span> A NOIR ROGUELIKE <span class="header-divider">/</span> VOL. 01</div>
+      <div class="header-center"><span class="live-dot"></span> A PIXEL NOIR ROGUELIKE <span class="header-divider">/</span> VOL. 01</div>
       <nav class="header-nav" aria-label="게임 메뉴">
         <button class="text-button" data-action="controls"><span class="nav-symbol">⌘</span> 조작 안내</button>
         <button class="text-button" data-action="settings"><span class="nav-symbol">⚙</span> 설정</button>
@@ -47,7 +65,7 @@
 
         <section id="title-screen" class="title-screen ui-layer" aria-labelledby="game-title">
           <div class="title-content">
-            <div class="edition"><span></span> INTERACTIVE NOIR · 2D ACTION</div>
+            <div class="edition"><span></span> PIXEL NOIR · 도트 액션</div>
             <div class="title-kicker">이 도시에서, 진실은 방아쇠 끝에 있다.</div>
             <h1 id="game-title">새벽 전<br><em>마지막 탄환</em><span class="title-period">.</span></h1>
             <p class="title-description">배신의 밤, 사라진 장부, 마지막 한 발.<br>새벽이 오기 전, 이 도시의 진실을 찾아라.</p>
@@ -466,6 +484,8 @@ return { AudioEngine };
 __modules["./render.js"] = (() => {
 const WIDTH = 1280;
 const HEIGHT = 720;
+// One art pixel is four world units. Physics and mouse aiming stay at 1280×720.
+const DOT = 4;
 const TAU = Math.PI * 2;
 const COLORS = {
   ink: '#090d12', paper: '#eadbb3', gold: '#e9b85a', red: '#ed4d4c',
@@ -491,22 +511,123 @@ function polygon(ctx, points, color, stroke = null) {
 }
 
 function glow(ctx, x, y, radius, color) {
-  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-  gradient.addColorStop(0, color); gradient.addColorStop(1, 'transparent');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  // Nested stepped halos instead of a blurred bloom filter.
+  ctx.save(); ctx.fillStyle = color; ctx.globalAlpha *= 0.22;
+  for (let ring = 4; ring >= 1; ring--) {
+    const r = Math.ceil(radius * ring / 4 / DOT) * DOT;
+    for (let row = -r; row < r; row += DOT * 2) {
+      const half = Math.floor(Math.sqrt(Math.max(0, r * r - row * row)) / DOT) * DOT;
+      ctx.fillRect(Math.round(x / DOT) * DOT - half, Math.round(y / DOT) * DOT + row, half * 2, DOT * 2);
+    }
+  }
+  ctx.restore();
 }
 
 function label(ctx, text, x, y, size = 12, color = COLORS.paper, align = 'center') {
+  // Korean labels are composited at display resolution; only the art is pixelated.
+  if (ctx.pixelLabels) {
+    const m = ctx.getTransform();
+    ctx.pixelLabels.push({ text, x, y, size, color, align, alpha: ctx.globalAlpha,
+      transform: [m.a, m.b, m.c, m.d, m.e, m.f].map(value => value * DOT) });
+    return;
+  }
   ctx.font = `${size > 16 ? '600' : '500'} ${size}px "Noto Sans KR", "Malgun Gothic", sans-serif`;
   ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
   ctx.fillText(text, x, y);
 }
 
+// Hand-authored sprite rows. Dots are transparent; each other character is one
+// palette entry. The silhouettes differ as well as the colors (hat/hood/armor).
+const SPRITES = {
+  player: [
+    '....HHHH....', '...HhhhhH...', '..hHHHHHHh..', '....sShS....',
+    '....sSS.....', '...cLrC.....', '..cCLrCC....', '..cCLrCCc...',
+    '..cCCrCCc...', '..cCCCCCc...', '..cCCCCCc...', '..cCc.CCc...', '.ccCc.CCcc..',
+  ],
+  pistol: [
+    '....hhhh....', '...hhhhhh...', '..HHHHHHHH..', '....sSSS....',
+    '....sSS.....', '...cLrC.....', '..cCLrCC....', '..cCLrCCc...',
+    '..cCCrCCc...', '...CCCCC....', '...CCCCC....', '...Cc.CC....', '...cc.Cc....',
+  ],
+  smg: [
+    '....hhhh....', '....hhhhS...', '....sSSSS...', '....ssSS....',
+    '.....SS.....', '...CCLCC....', '..CCCCCCC...', '..CCCCCCC...',
+    '..sCcCCCs...', '..sCrCCCs...', '...CrCCC....', '...CCCCC....', '...cc.Cc....',
+  ],
+  shotgun: [
+    '....HHHH....', '...HHHHHHH..', '....hSSS....', '....sSSS....',
+    '.....ss.....', '...CCCCC....', '..CcLcLcC...', '..CcLcLcC...',
+    '..CcccccC...', '..CcccccC...', '...CCCCC....', '...CCCCC....', '...cc.Cc....',
+  ],
+  rusher: [
+    '.....rr.....', '....rCCr....', '...rCCCCr...', '...rhhLLr...',
+    '...rhhSSr...', '....cCCc....', '...cCCCCc...', '..ccCCCCCc..',
+    '..ccCCCCCc..', '..ccCCCCCc..', '...ccCCC....', '...ccCCC....', '...cc.Cc....',
+  ],
+  heavy: [
+    '....HHHH....', '...HHHHHH...', '...hLLLLh...', '...hssssH...',
+    '..cHHHHHHc..', '.cCCHHHHCCc.', '.cCccccccCc.', '.cCcLLLLcCc.',
+    '.cCccccccCc.', '.cCcLLLLcCc.', '..CcLrrLcC..', '..CCCCCCCC..', '..CCC..CCC..',
+  ],
+  boss: [
+    '....HHHH....', '...HHHHHH...', '...rrrrrr...', '..HHHHHHHH..',
+    '....sSSS....', '....sSS.....', '..CCHrHCC...', '..CCHrHCC...',
+    '..CCHrHCC...', '..CCCCCCC...', '..CCCCCCC...', '..CCC.CCC...', '.cCCC.CCCc..',
+  ],
+  portrait: [
+    '.......hhhhhh.......', '......hHHHHHHh......', '......hHhhhhHh......',
+    '......hhhhhhhh......', '...hhhhHHHHHHhhhh...', '...hHHHHHHHHHHHHh...',
+    '.......ssSSSS.......', '.......sshShSS......', '.......sssSSS.......',
+    '........ssSS........', '......cCLSrCC.......', '.....cCCLLrCCC......',
+    '....cCCCLLrCCCc.....', '...cCCCcLLrCCCCc....', '...cCCccCLrCCcCCc...',
+    '...cCCccCCrCCcCCc...', '...cCCccCCCCCcCCc...', '...cCCccCCCCCcCCc...',
+    '...sScCCLCCCCcCCc...', '...sSccCLCCCCcCCc...', '.....ccCLCCCCcCSSc..',
+    '.....ccCLCCCCc.SSL..', '....cccCLCCCCcc.LL..', '....cccCLCCCCcc.LL..',
+    '...ccccCLcCCCcccLL..', '...cccCCc.ccCCccLL..', '...ccCCCc.ccCCCcLL..',
+    '.....ccCc.ccCc......', '.....cCCc.cCCc......', '.....cCCc.cCCc......',
+    '.....cCCc.cCCc......', '....hHHH..HHHHh.....',
+  ],
+};
+const PALETTES = {
+  player: { H: '#98aaa9', h: '#3e5669', c: '#253747', C: '#617d8a', L: '#e4d4a8', r: '#c24f49', s: '#8d796c', S: '#d8bb91' },
+  pistol: { H: '#928e8e', h: '#383b4a', c: '#3c3545', C: '#7f7584', L: '#c6b8a2', r: '#bf5b55', s: '#896753', S: '#d0a88a' },
+  smg: { H: '#a97b67', h: '#352e30', c: '#433d3d', C: '#8c6958', L: '#c7a487', r: '#d28a68', s: '#987258', S: '#d0a88a' },
+  shotgun: { H: '#85855c', h: '#353d35', c: '#263b3b', C: '#7b8d77', L: '#e6c27d', r: '#d7a56c', s: '#8b7761', S: '#ceb99c' },
+  rusher: { H: '#9e6a72', h: '#251d2d', c: '#412e43', C: '#875360', L: '#f2a987', r: '#ae6a72', s: '#665057', S: '#c9a293' },
+  heavy: { H: '#8e9d9e', h: '#25333e', c: '#273541', C: '#607886', L: '#d2b477', r: '#ef965d', s: '#574b47', S: '#b3a48a' },
+  boss: { H: '#ead9b3', h: '#676761', c: '#6d7173', C: '#b9b9a7', L: '#f2d6a0', r: '#ab484c', s: '#8c7666', S: '#cfb797' },
+};
+const GUNS = {
+  pistol: ['LLLLL', 'HHHHH', '.CC..', '.CC..'],
+  revolver: ['..LLLLL', 'HHLHHHH', '.CCC...', '.CC....'],
+  smg: ['.L......', 'HHHHHHLL', 'CCCCCC..', '.C.CC...', '.C.CC...'],
+  shotgun: ['LLLLLLLLLLL', 'CCHHHHHHHHH', 'CC.CCC.....'],
+  heavy: ['.L.......', 'HHHHHHHLLL', 'CCCCCCC...', '.C.CCC....', '.C.CCC....'],
+  boss: ['LLLLLLLLLL', 'HHHHHHHHHH', '.CC..CC...', '.CC..CC...'],
+};
+function sprite(ctx, rows, palette, x, y, dot = DOT) {
+  for (let row = 0; row < rows.length; row++) for (let col = 0; col < rows[row].length; col++) {
+    const color = palette[rows[row][col]];
+    if (color) { ctx.fillStyle = color; ctx.fillRect(x + col * dot, y + row * dot, dot, dot); }
+  }
+}
+
+const LETTERS = {
+  A: ['.x.', 'x.x', 'xxx', 'x.x', 'x.x'], B: ['xx.', 'x.x', 'xx.', 'x.x', 'xx.'],
+  R: ['xx.', 'x.x', 'xx.', 'x.x', 'x.x'], H: ['x.x', 'x.x', 'xxx', 'x.x', 'x.x'],
+  O: ['xxx', 'x.x', 'x.x', 'x.x', 'xxx'], T: ['xxx', '.x.', '.x.', '.x.', '.x.'],
+  E: ['xxx', 'x..', 'xx.', 'x..', 'xxx'], L: ['x..', 'x..', 'x..', 'x..', 'xxx'],
+};
+
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false });
+    this.output = canvas.getContext('2d', { alpha: false });
+    this.art = document.createElement('canvas');
+    this.art.width = WIDTH / DOT; this.art.height = HEIGHT / DOT;
+    this.ctx = this.art.getContext('2d', { alpha: false });
+    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.pixelLabels = [];
     this.pixelRatio = Math.min(globalThis.devicePixelRatio || 1, 2);
     canvas.width = WIDTH * this.pixelRatio;
     canvas.height = HEIGHT * this.pixelRatio;
@@ -526,17 +647,19 @@ class Renderer {
     const animated = game.mode === 'playing' || game.mode === 'title' || !game.room;
     if (animated) this.time += Math.min(realDt || 0, 0.1) * (game.slowActive ? 0.4 : 1);
     const ctx = this.ctx;
-    ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+    ctx.pixelLabels.length = 0;
+    ctx.setTransform(1 / DOT, 0, 0, 1 / DOT, 0, 0);
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     if (!game.room || game.mode === 'title') {
       this.drawTitle(game);
+      this.present();
       return;
     }
     const settings = game.settings || {};
     const shake = Math.min(game.shake || 0, 14) * (settings.shake ?? 0.6);
     ctx.save();
-    ctx.translate(Math.sin(this.time * 143) * shake, Math.cos(this.time * 173) * shake * 0.65);
-    const camera = game.camera?.x || 0;
+    ctx.translate(Math.round(Math.sin(this.time * 143) * shake / DOT) * DOT, Math.round(Math.cos(this.time * 173) * shake * 0.65 / DOT) * DOT);
+    const camera = Math.round((game.camera?.x || 0) / DOT) * DOT;
     this.drawBackground(game.room, camera);
     ctx.save(); ctx.translate(-camera, 0);
     this.drawWorld(game.room, camera);
@@ -570,11 +693,25 @@ class Renderer {
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
     }
     if (game.mode === 'playing') this.drawCrosshair(game);
+    this.present();
+  }
+
+  present() {
+    const ctx = this.output;
+    ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+    ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.art, 0, 0, WIDTH, HEIGHT);
+    for (const item of this.ctx.pixelLabels) {
+      ctx.save(); ctx.transform(...item.transform); ctx.globalAlpha = item.alpha;
+      label(ctx, item.text, item.x, item.y, item.size, item.color, item.align);
+      ctx.restore();
+    }
   }
 
   makeTitleArt() {
-    const canvas = document.createElement('canvas'); canvas.width = WIDTH; canvas.height = HEIGHT;
+    const canvas = document.createElement('canvas'); canvas.width = WIDTH / DOT; canvas.height = HEIGHT / DOT;
     const ctx = canvas.getContext('2d');
+    ctx.scale(1 / DOT, 1 / DOT); ctx.imageSmoothingEnabled = false;
     const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
     sky.addColorStop(0, '#101b24'); sky.addColorStop(0.65, '#36404a'); sky.addColorStop(1, '#10151a');
     ctx.fillStyle = sky; ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -641,25 +778,8 @@ class Renderer {
       ctx.fillRect(x, y, length, 1 + depth * 2);
     }
     this.lamp(ctx, 1048, 532, 346, true);
-    // A larger-than-life detective, split between streetlight and shadow.
-    ctx.save(); ctx.translate(912, 650); ctx.scale(2.78, 2.78);
-    polygon(ctx, [[-14, -61], [-23, -47], [-27, -10], [-17, -3], [-9, -12], [3, -8], [16, -2], [22, -9], [16, -47], [9, -62]], '#0a1015', '#596164');
-    polygon(ctx, [[-10, -61], [-3, -46], [-8, -11], [-15, -14], [-16, -51]], '#1c272e');
-    polygon(ctx, [[5, -61], [13, -51], [15, -17], [7, -9], [4, -39]], '#283237');
-    polygon(ctx, [[-5, -56], [2, -56], [7, -42], [-1, -45]], '#9b9281');
-    polygon(ctx, [[-1, -53], [2, -53], [3, -37], [0, -35]], '#77312e');
-    polygon(ctx, [[-12, -13], [-2, -11], [-5, 0], [-17, 0]], '#090e13');
-    polygon(ctx, [[4, -12], [13, -13], [17, 0], [5, 0]], '#0a0e13');
-    polygon(ctx, [[-15, -51], [-24, -42], [-23, -23], [-17, -26], [-15, -38]], '#131b22');
-    polygon(ctx, [[14, -52], [23, -41], [29, -25], [24, -22], [14, -35]], '#151d23', '#4d5353');
-    ctx.fillStyle = '#8f8573'; ctx.fillRect(24, -25, 5, 6);
-    ctx.save(); ctx.translate(29, -21); ctx.rotate(1.12); this.drawGun(ctx, 'pistol', 1.05, false); ctx.restore();
-    polygon(ctx, [[-7, -75], [8, -76], [9, -62], [2, -58], [-7, -64]], '#726f64');
-    polygon(ctx, [[-7, -74], [2, -76], [1, -61], [-7, -64]], '#182027');
-    polygon(ctx, [[-13, -78], [-8, -88], [8, -89], [15, -79]], '#111a20', '#57605f');
-    polygon(ctx, [[-19, -79], [17, -81], [21, -77], [-15, -75]], '#0b1117', '#68716d');
-    line(ctx, 4, -70, 12, -71, '#d2ba82', 0.7);
-    ctx.restore();
+    // A larger portrait keeps the in-game coat, fedora, red tie and palette.
+    sprite(ctx, SPRITES.portrait, PALETTES.player, 832, 396, 8);
     // Near-side pipe and foreground silhouette anchor the image.
     line(ctx, 1250, 0, 1250, 720, '#02070b', 18);
     const shade = ctx.createLinearGradient(0, 0, WIDTH, 0);
@@ -674,7 +794,7 @@ class Renderer {
 
   drawTitle() {
     const ctx = this.ctx;
-    ctx.drawImage(this.titleArt, 0, 0);
+    ctx.drawImage(this.titleArt, 0, 0, WIDTH, HEIGHT);
     this.drawRain(0, 0.8);
     const flicker = 0.017 + Math.max(0, Math.sin(this.time * 0.9)) * 0.012;
     glow(ctx, 802, 285, 160, `rgba(225,70,54,${flicker})`);
@@ -689,11 +809,11 @@ class Renderer {
     ctx.save();
     glow(ctx, x + width / 2, y + height / 2, width * 1.2, '#b83e3020');
     ctx.fillStyle = '#100f12'; ctx.fillRect(x - 4, y - 4, width + 8, height + 8);
-    ctx.strokeStyle = '#bd4b42'; ctx.lineWidth = 1; ctx.strokeRect(x, y, width, height);
-    ctx.shadowColor = '#ed5148'; ctx.shadowBlur = 13;
-    ctx.font = `${vertical ? 700 : 500} ${height * 0.64}px Georgia, serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ee7663';
-    ctx.fillText(text, x + width / 2, y + height / 2 + 1);
+    ctx.strokeStyle = '#bd4b42'; ctx.lineWidth = DOT; ctx.strokeRect(x, y, width, height);
+    const dot = DOT, textWidth = (text.length * 4 - 1) * dot;
+    for (let i = 0; i < text.length; i++) {
+      sprite(ctx, LETTERS[text[i]] || [], { x: '#f28b76' }, Math.round((x + (width - textWidth) / 2) / DOT) * DOT + i * 4 * dot, Math.round((y + (height - 5 * dot) / 2) / DOT) * DOT, dot);
+    }
     ctx.restore();
   }
 
@@ -932,67 +1052,53 @@ class Renderer {
 
   drawGun(ctx, id, scale = 1, muzzle = false, tint = null) {
     ctx.save(); ctx.scale(scale, scale);
-    ctx.fillStyle = tint || '#b2b6af';
-    const length = { pistol: 20, revolver: 25, smg: 31, shotgun: 42, heavy: 37, boss: 39 }[id] || 20;
-    if (id === 'shotgun') {
-      ctx.fillRect(1, -4, length, 4); ctx.fillStyle = tint || '#9b7351'; ctx.fillRect(12, 0, 12, 4); ctx.fillRect(-4, -2, 9, 6);
-    } else if (id === 'smg' || id === 'heavy' || id === 'boss') {
-      ctx.fillRect(0, -5, length - 7, 8); ctx.fillRect(length - 7, -3, 7, 4);
-      ctx.fillStyle = tint || '#4b5559'; ctx.fillRect(10, 2, 6, 12); ctx.fillRect(0, 1, 5, 8);
-      ctx.fillStyle = tint || '#d1c7a7'; ctx.fillRect(5, -7, 3, 2);
-    } else {
-      ctx.fillRect(0, -5, length, 5); ctx.fillRect(1, -1, 6, 9);
-      if (id === 'revolver') { ctx.fillStyle = tint || '#646d6f'; ctx.fillRect(3, -4, 7, 7); }
-      else { ctx.fillStyle = tint || '#434e54'; ctx.fillRect(1, -4, 12, 2); }
-    }
+    const rows = GUNS[id] || GUNS.pistol;
+    const length = Math.max(...rows.map(row => row.length)) * DOT;
+    sprite(ctx, rows, { L: tint || '#dfd9b7', H: tint || '#98a8a9', C: tint || '#53616b' }, 0, -8);
     if (muzzle) {
       ctx.globalAlpha *= Number(muzzle);
-      polygon(ctx, [[length + 2, -3], [length + 16, -9], [length + 11, -1], [length + 23, 1], [length + 11, 4], [length + 16, 9], [length + 1, 3]], '#ffdb86');
-      polygon(ctx, [[length, -2], [length + 14, 0], [length, 3]], '#fff4cd');
+      sprite(ctx, ['..o....', '.oYo...', 'oYYYoo.', '.oYo...', '..o....'],
+        { o: '#e9a656', Y: '#fff0b6' }, length, -12);
     }
     ctx.restore();
   }
 
+  drawLegs(ctx, type, stride = 0) {
+    const palette = PALETTES[type];
+    const step = Math.round(stride / DOT) * DOT;
+    ctx.fillStyle = '#17232f'; ctx.fillRect(-12 + step, -16, 8, 16);
+    ctx.fillStyle = palette.c; ctx.fillRect(4 - step, -16, 8, 16);
+    ctx.fillStyle = palette.H; ctx.fillRect(-16 + step, -4, 12, 4); ctx.fillRect(4 - step, -4, 12, 4);
+  }
+
   drawPlayer(p, game) {
     const ctx = this.ctx;
-    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.save(); ctx.translate(Math.round(p.x / DOT) * DOT, Math.round(p.y / DOT) * DOT);
     const dir = Math.cos(p.aim || 0) >= 0 ? 1 : -1;
     const moving = Math.abs(p.vx || 0) > 15 && p.grounded;
-    const stride = moving ? Math.sin(p.animation || this.time * 16) * 7 : 0;
-    const coat = moving ? Math.sin(p.animation || this.time * 15) * 4 - Math.sign(p.vx) * 5 : Math.sin(this.time * 2) * 1.5;
-    const invuln = p.invuln > 0;
-    if (invuln) ctx.globalAlpha = game.settings?.flash === 0 ? 0.72 : 0.6 + Math.sin(this.time * 48) * 0.18 * (game.settings?.flash ?? 0.5);
-    ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(0, -1, 21, 4, 0, 0, TAU); ctx.fill();
+    const stride = moving ? Math.sin(p.animation || this.time * 16) * 6 : 0;
+    if (p.invuln > 0) ctx.globalAlpha = game.settings?.flash === 0 ? 0.72 : 0.6 + Math.sin(this.time * 48) * 0.18 * (game.settings?.flash ?? 0.5);
+    ctx.fillStyle = '#0007'; ctx.fillRect(-20, -4, 40, 8);
     if (p.rollTime > 0) {
-      ctx.translate(0, -18); ctx.rotate((p.rollTime * 17) * (p.rollDir || dir)); ctx.translate(0, 33);
+      ctx.translate(0, -24); ctx.rotate(Math.round(p.rollTime * 17 / (Math.PI / 4)) * Math.PI / 4 * (p.rollDir || dir)); ctx.translate(0, 28);
     }
-    // Legs, trailing coat, then pale lapel keep the player distinct in the dark.
-    line(ctx, -6, -25, -7 + stride, -4, '#171d24', 8);
-    line(ctx, 6, -25, 7 - stride, -4, '#3b4247', 7);
-    line(ctx, -9 + stride, -2, -1 + stride, -2, '#91938c', 3);
-    line(ctx, 3 - stride, -2, 13 - stride, -2, '#7f827e', 3);
-    polygon(ctx, [[-10, -49], [-15, -36], [-17 + coat, -11], [-4, -17], [3, -13], [16 + coat, -10], [11, -39], [8, -49]], '#303b45', '#a3aba7');
-    polygon(ctx, [[-9, -48], [-2, -39], [-6 + coat * 0.5, -16], [-12 + coat, -12]], '#16222c');
-    polygon(ctx, [[2, -48], [8, -44], [6, -34], [-1, -38]], '#c4bca3');
-    polygon(ctx, [[0, -43], [3, -42], [2, -31], [-1, -33]], '#b44840');
-    ctx.fillStyle = '#bfb298'; ctx.fillRect(-5, -60, 12, 13);
-    ctx.fillStyle = '#3e4444'; ctx.fillRect(dir > 0 ? -6 : 3, -60, 5, 11);
-    ctx.fillStyle = '#6f7d80'; ctx.fillRect(-8, -65, 16, 7);
-    ctx.fillStyle = '#202d35'; ctx.fillRect(-8, -64, 16, 6);
-    polygon(ctx, [[-14, -59], [11, -61], [15, -57], [-13, -56]], '#333f47', '#a7aea6');
+    ctx.save(); ctx.scale(dir, 1);
+    this.drawLegs(ctx, 'player', stride);
+    sprite(ctx, SPRITES.player, PALETTES.player, -24, -64);
+    if (moving) {
+      ctx.fillStyle = '#617d8a';
+      ctx.fillRect(-24 - (stride > 0 ? 4 : 0), -20, 8, 8);
+    }
+    ctx.restore();
     const id = p.weapons?.[p.weaponIndex]?.id || 'pistol';
     const recoil = Math.min((p.recoil || 0) / ({ pistol: 3, revolver: 7, smg: 2.3, shotgun: 9 }[id] || 3), 1);
     ctx.save(); ctx.translate(0, -40); ctx.rotate(p.aim || 0);
     if (dir < 0) ctx.scale(1, -1);
-    line(ctx, 0, 2, 12 - recoil * 5, 3, '#7b8589', 7);
-    ctx.fillStyle = '#c9b89a'; ctx.fillRect(10 - recoil * 4, -1, 6, 6);
-    ctx.translate(15 - recoil * 5, 0); ctx.rotate(-recoil * 0.1);
+    ctx.fillStyle = '#91a6ab'; ctx.fillRect(0, 0, 12 - recoil * 4, 8);
+    ctx.fillStyle = '#dec39a'; ctx.fillRect(8 - recoil * 4, 0, 8, 4);
+    ctx.translate(16 - recoil * 4, 0);
     this.drawGun(ctx, id, 1, p.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);
-    ctx.restore();
-    if (p.rollTime > 0) {
-      ctx.strokeStyle = '#e9ca834d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -33, 30, 0.3, 2.5); ctx.stroke();
-    }
-    ctx.restore();
+    ctx.restore(); ctx.restore();
     if (p.upgrades?.dodgeShot && p.dodgeBuff > 0) glow(ctx, p.x, p.y - 36, 24, '#ecc36b30');
   }
 
@@ -1008,12 +1114,12 @@ class Renderer {
       const direction = e.facing || (Math.cos(aim) >= 0 ? 1 : -1);
       const length = boss ? 380 : 260;
       ctx.setLineDash([10, 9]);
-      line(ctx, e.x, e.y - 8, e.x + direction * length, e.y - 8, '#ed9368', 2);
+      line(ctx, e.x, e.y - 8, e.x + direction * length, e.y - 8, '#ed9368', DOT);
       ctx.setLineDash([]);
       for (let i = 1; i <= 4; i++) {
         const x = e.x + direction * (i * length / 5);
-        line(ctx, x - direction * 8, e.y - 16, x, e.y - 8, '#f3a671', 2);
-        line(ctx, x, e.y - 8, x - direction * 8, e.y, '#f3a671', 2);
+        line(ctx, x - direction * 8, e.y - 16, x, e.y - 8, '#f3a671', DOT);
+        line(ctx, x, e.y - 8, x - direction * 8, e.y, '#f3a671', DOT);
       }
     } else {
       const fan = boss && e.pattern === 'fan';
@@ -1023,7 +1129,7 @@ class Renderer {
       ctx.setLineDash([7, 9]);
       for (const offset of offsets) {
         const angle = aim + offset;
-        line(ctx, e.x, y, e.x + Math.cos(angle) * length, y + Math.sin(angle) * length, '#f59b6a', boss && !fan ? 2 : 1);
+        line(ctx, e.x, y, e.x + Math.cos(angle) * length, y + Math.sin(angle) * length, '#f59b6a', DOT);
       }
     }
     ctx.restore();
@@ -1052,49 +1158,19 @@ class Renderer {
     const windup = e.state === 'windup';
     if (e.spawnTime > 0) { this.drawSpawnWarning(e); return; }
     if (windup) this.drawEnemyTell(e);
-    ctx.save(); ctx.translate(e.x, e.y); ctx.scale(scale, scale);
+    ctx.save(); ctx.translate(Math.round(e.x / DOT) * DOT, Math.round(e.y / DOT) * DOT); ctx.scale(scale, scale);
     const stride = Math.abs(e.vx || 0) > 5 ? Math.sin(this.time * 12 + e.x * 0.04) * 5 : 0;
-    ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(0, -1, w * 0.65 / scale, 4, 0, 0, TAU); ctx.fill();
-    line(ctx, -7, -23, -7 + stride, -3, '#282b30', heavy ? 11 : 8);
-    line(ctx, 7, -23, 8 - stride, -3, '#3f4243', heavy ? 11 : 8);
-    line(ctx, -12 + stride, -2, -2 + stride, -2, '#8b8d80', 3);
-    line(ctx, 4 - stride, -2, 14 - stride, -2, '#8b8d80', 3);
-    const body = boss ? '#bdb7a6' : heavy ? '#646b68' : rusher ? '#5d4548' : e.type === 'smg' ? '#6a5a50' : e.type === 'shotgun' ? '#7b6950' : '#625d5d';
-    polygon(ctx, [[-11, -46], [-heavy * 5 - 14, -35], [-12, -17], [12, -17], [heavy * 5 + 14, -35], [10, -46]], body, '#c2b2a04a');
-    if (boss) {
-      polygon(ctx, [[-4, -45], [4, -45], [8, -22], [-2, -28]], '#822e31');
-      polygon(ctx, [[-11, -32], [-17, -12], [-4, -16], [-1, -33]], '#8b8a80');
-    } else if (heavy) {
-      ctx.fillStyle = '#303c42'; ctx.fillRect(-12, -42, 24, 21);
-      line(ctx, -10, -38, 10, -38, '#9b9f89', 2); line(ctx, -10, -29, 10, -29, '#949881', 2);
-      ctx.fillStyle = '#d3905b'; ctx.fillRect(-3, -35, 6, 4);
-    } else if (e.type === 'shotgun') {
-      ctx.fillStyle = '#273139'; ctx.fillRect(-8, -44, 16, 23);
-      for (let j = 0; j < 4; j++) { ctx.fillStyle = '#c9a57a'; ctx.fillRect(-9 + j * 5, -37, 3, 8); }
-    } else {
-      polygon(ctx, [[-3, -45], [3, -44], [5, -32], [-2, -36]], '#bdaea0');
-    }
-    ctx.fillStyle = '#b1a18b'; ctx.fillRect(-6, -57, 12, 12);
-    if (rusher) {
-      polygon(ctx, [[-10, -49], [-10, -58], [-4, -64], [6, -63], [11, -54], [8, -47]], '#573f42', '#987874');
-      ctx.fillStyle = '#17171c'; ctx.fillRect(-5, -57, 10, 8); ctx.fillStyle = '#df9e7f'; ctx.fillRect(dir > 0 ? 2 : -5, -55, 3, 2);
-    } else if (heavy) {
-      ctx.fillStyle = '#4c5d62'; ctx.fillRect(-9, -61, 18, 10); ctx.fillStyle = '#0c141a'; ctx.fillRect(-9, -55, 18, 4);
-      ctx.fillStyle = '#dc9274'; ctx.fillRect(dir > 0 ? 4 : -8, -54, 4, 2);
-    } else if (e.type === 'shotgun') {
-      ctx.fillStyle = '#3e413c'; ctx.fillRect(-8, -61, 16, 6); ctx.fillRect(dir > 0 ? 3 : -13, -57, 11, 3);
-    } else {
-      ctx.fillStyle = boss ? '#bab3a1' : '#343239'; ctx.fillRect(-8, -63, 16, 8); ctx.fillRect(-12, -56, 26, 3);
-      if (boss) { ctx.fillStyle = '#5f3936'; ctx.fillRect(-8, -58, 16, 2); }
-    }
+    ctx.fillStyle = '#0006'; ctx.fillRect(-20, -4, 40, 8);
+    ctx.save(); ctx.scale(dir, 1);
+    this.drawLegs(ctx, e.type, stride);
+    sprite(ctx, SPRITES[e.type], PALETTES[e.type], -24, -64);
+    ctx.restore();
     ctx.save(); ctx.translate(0, -37); ctx.rotate(aim); if (dir < 0) ctx.scale(1, -1);
-    line(ctx, 0, 0, 14, 2, body, heavy ? 9 : 7);
-    ctx.fillStyle = '#ae9b83'; ctx.fillRect(11, -1, 6, 5);
-    ctx.translate(15, 0);
+    ctx.fillStyle = PALETTES[e.type].C; ctx.fillRect(0, 0, 16, heavy ? 12 : 8);
+    ctx.fillStyle = '#d2b398'; ctx.fillRect(12, 0, 8, 4); ctx.translate(16, 0);
     if (rusher) {
-      polygon(ctx, [[-1, 1], [22, -7], [14, 2], [0, 4]], '#c5c9bf');
-      ctx.fillStyle = '#805647'; ctx.fillRect(-5, 0, 7, 4);
-    } else this.drawGun(ctx, e.type === 'heavy' ? 'heavy' : e.type, 0.88, e.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);
+      sprite(ctx, ['.....LL', '..LLLL.', 'HHLL...', 'HH.....'], { L: '#e1e4cf', H: '#ae795d' }, 0, -8);
+    } else this.drawGun(ctx, e.type, 1, e.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);
     ctx.restore();
     if (e.flash > 0 && game.settings?.flash !== 0) {
       ctx.globalAlpha = Math.min(0.6, e.flash * 3) * (game.settings?.flash ?? 0.5); ctx.fillStyle = '#fff0c9'; ctx.fillRect(-9, -44, 18, 24); ctx.globalAlpha = 1;
@@ -1120,14 +1196,15 @@ class Renderer {
   drawBullet(b) {
     const ctx = this.ctx, enemy = b.owner === 'enemy';
     const length = enemy ? 0.035 : 0.018;
-    const px = b.x - (b.vx || 0) * length, py = b.y - (b.vy || 0) * length;
+    const x = Math.round(b.x / DOT) * DOT, y = Math.round(b.y / DOT) * DOT;
+    const px = x - (b.vx || 0) * length, py = y - (b.vy || 0) * length;
     const color = b.color || (enemy ? '#f28b73' : '#f8d28b');
     ctx.save();
-    line(ctx, px, py, b.x, b.y, enemy ? '#f37c5840' : '#efc47b42', enemy ? 5 : 4);
-    line(ctx, px + (b.x - px) * 0.3, py + (b.y - py) * 0.3, b.x, b.y, color, enemy ? 2 : 1.8);
-    ctx.fillStyle = enemy ? '#ffbd96' : '#fff1bf';
-    ctx.beginPath(); ctx.arc(b.x, b.y, enemy ? Math.max(3.5, b.radius || 3) : 2.3, 0, TAU); ctx.fill();
-    if (enemy) { ctx.strokeStyle = '#ffd3ab'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, TAU); ctx.stroke(); }
+    line(ctx, px, py, x, y, enemy ? '#b54e46' : '#947346', DOT);
+    ctx.fillStyle = enemy ? '#ad423c' : color;
+    const r = enemy ? DOT : DOT / 2;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    ctx.fillStyle = enemy ? '#ffce93' : '#fff1bf'; ctx.fillRect(x - 2, y - 2, DOT, DOT);
     ctx.restore();
   }
 
@@ -1136,8 +1213,7 @@ class Renderer {
     ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, p.life / (p.maxLife || 0.4)));
     ctx.fillStyle = p.color || '#d9b46d';
     if (p.type === 'text') {
-      ctx.font = 'bold 14px "Malgun Gothic", sans-serif'; ctx.textAlign = 'center';
-      ctx.lineWidth = 3; ctx.strokeStyle = '#0a0f14'; ctx.strokeText(p.text || '', p.x, p.y); ctx.fillText(p.text || '', p.x, p.y);
+      label(ctx, p.text || '', p.x, p.y, 14, p.color || '#d9b46d');
     } else if (p.type === 'shell') {
       ctx.translate(p.x, p.y); ctx.rotate(p.life * 13); ctx.fillStyle = '#d9b675'; ctx.fillRect(-2, -1, 4, 2);
     } else if (p.type === 'smoke') {
@@ -1152,14 +1228,14 @@ class Renderer {
 
   drawRain(camera = 0, opacity = 1) {
     const ctx = this.ctx;
-    ctx.lineWidth = 0.8;
     for (const drop of this.rain) {
-      const y = (drop.y + this.time * drop.speed) % 800 - 40;
-      const x = ((drop.x - this.time * 94 - camera * 0.15) % 1450 + 1450) % 1450 - 90;
-      line(ctx, x, y, x - drop.length * 0.25, y + drop.length, `rgba(170,192,205,${drop.alpha * opacity})`, 0.8);
+      const y = Math.floor(((drop.y + this.time * drop.speed) % 800 - 40) / DOT) * DOT;
+      const x = Math.floor(((((drop.x - this.time * 94 - camera * 0.15) % 1450 + 1450) % 1450) - 90) / DOT) * DOT;
+      ctx.fillStyle = `rgba(149,178,197,${drop.alpha * opacity * 0.65})`;
+      ctx.fillRect(x, y, DOT, DOT * 2);
+      if (drop.length > 16) ctx.fillRect(x - DOT, y + DOT * 2, DOT, DOT * 2);
       if (y > 634 && y < 657) {
-        ctx.strokeStyle = `rgba(170,192,205,${drop.alpha * opacity})`;
-        ctx.beginPath(); ctx.ellipse(x, 647, 3 + (y - 634) * 0.2, 1, 0, 0, TAU); ctx.stroke();
+        ctx.fillRect(x - DOT * 2, 648, DOT, DOT); ctx.fillRect(x + DOT, 648, DOT, DOT);
       }
     }
   }
@@ -1178,16 +1254,14 @@ class Renderer {
   drawCrosshair(game) {
     const mouse = game.input?.mouse;
     if (!mouse || !Number.isFinite(mouse.x) || !Number.isFinite(mouse.y)) return;
-    const ctx = this.ctx, x = mouse.x, y = mouse.y;
-    const gap = 5 + Math.min(game.player?.recoil || 0, 1) * 5;
+    const ctx = this.ctx, x = Math.round(mouse.x / DOT) * DOT, y = Math.round(mouse.y / DOT) * DOT;
+    const gap = 8 + Math.round(Math.min(game.player?.recoil || 0, 1)) * DOT;
     ctx.save();
-    ctx.strokeStyle = '#0a0e13'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(x, y, 2, 0, TAU); ctx.stroke();
     for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      line(ctx, x + dx * gap, y + dy * gap, x + dx * (gap + 6), y + dy * (gap + 6), '#0c1117', 3);
-      line(ctx, x + dx * gap, y + dy * gap, x + dx * (gap + 6), y + dy * (gap + 6), '#e8d9b5', 1);
+      ctx.fillStyle = '#0c1117'; ctx.fillRect(x + dx * gap - 4, y + dy * gap - 4, 12, 12);
+      ctx.fillStyle = '#eadbb3'; ctx.fillRect(x + dx * gap, y + dy * gap, DOT, DOT);
     }
-    ctx.fillStyle = '#e7b964'; ctx.fillRect(x - 1, y - 1, 2, 2);
+    ctx.fillStyle = '#e7b964'; ctx.fillRect(x, y, DOT, DOT);
     ctx.restore();
   }
 }
