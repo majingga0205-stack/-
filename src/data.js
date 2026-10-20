@@ -1,9 +1,9 @@
 /** The entire arsenal and encounter catalogue is local and deterministic. */
 export const WEAPONS = Object.freeze({
-  pistol: { id: 'pistol', name: '밤의 약속', tag: '권총', damage: 22, interval: 0.245, spread: 0.022, pellets: 1, magazine: 12, reload: 1.05, speed: 1450, range: 1550, recoil: 3, color: '#ffd184', description: '12발 · 빠른 재장전 · 흔들림 없는 조준' },
-  revolver: { id: 'revolver', name: '여섯 번째 증언', tag: '리볼버', damage: 68, interval: 0.59, spread: 0.014, pellets: 1, magazine: 6, reload: 1.8, speed: 1650, range: 1750, recoil: 7, color: '#ffe1a0', description: '6발 · 묵직한 한 발 · 긴 사거리' },
-  smg: { id: 'smg', name: '빗줄기', tag: '기관단총', damage: 14, interval: 0.078, spread: 0.068, pellets: 1, magazine: 30, reload: 1.6, speed: 1320, range: 1200, recoil: 2.3, color: '#ffc76c', description: '30발 · 빠른 연사 · 연속 사격 시 탄 퍼짐 증가' },
-  shotgun: { id: 'shotgun', name: '문을 두드리는 자', tag: '산탄총', damage: 18, interval: 0.83, spread: 0.16, pellets: 7, magazine: 5, reload: 1.75, speed: 1200, range: 750, recoil: 9, color: '#ffb97c', description: '5발 · 7개 산탄 · 근거리 제압 / 거리별 피해 감소' },
+  pistol: { id: 'pistol', wear: 0.22, name: '밤의 약속', tag: '권총', damage: 22, interval: 0.245, spread: 0.022, pellets: 1, magazine: 12, reload: 1.05, speed: 1450, range: 1550, recoil: 3, color: '#ffd184', description: '12발 · 빠른 재장전 · 흔들림 없는 조준' },
+  revolver: { id: 'revolver', wear: 0.55, name: '여섯 번째 증언', tag: '리볼버', damage: 68, interval: 0.59, spread: 0.014, pellets: 1, magazine: 6, reload: 1.8, speed: 1650, range: 1750, recoil: 7, color: '#ffe1a0', description: '6발 · 묵직한 한 발 · 긴 사거리' },
+  smg: { id: 'smg', wear: 0.09, name: '빗줄기', tag: '기관단총', damage: 14, interval: 0.078, spread: 0.068, pellets: 1, magazine: 30, reload: 1.6, speed: 1320, range: 1200, recoil: 2.3, color: '#ffc76c', description: '30발 · 빠른 연사 · 연속 사격 시 탄 퍼짐 증가' },
+  shotgun: { id: 'shotgun', wear: 0.65, name: '문을 두드리는 자', tag: '산탄총', damage: 18, interval: 0.83, spread: 0.16, pellets: 7, magazine: 5, reload: 1.75, speed: 1200, range: 750, recoil: 9, color: '#ffb97c', description: '5발 · 7개 산탄 · 근거리 제압 / 거리별 피해 감소' },
 });
 
 export const UPGRADES = Object.freeze([
@@ -54,6 +54,20 @@ const TEMPLATES = [
   { name: '새벽을 등진 집무실', platforms: [[680, 530, 430], [1260, 425, 390], [1800, 530, 440]], covers: [[510, 76, 52], [1150, 66, 52], [2290, 76, 52]], story: '“네 이름도 장부에 있다.” 그는 총을 내려놓지 않았다.' },
 ];
 
+// The combat layout varies by seed, while each address has its own identity.
+// This gives the nine rooms a readable journey instead of repeating one block.
+const DISTRICTS = [
+  { id: 'neon-alley', name: '1번가 · 붉은 네온 골목', subtitle: 'NIGHT MARKET · 01', story: '술집의 뒷문으로 검은 차가 들어갔다. 헤드라이트를 따라간다.', outdoors: true },
+  { id: 'bar-backroom', name: '정든 술집 · 뒷문', subtitle: 'THE LAST GLASS · 02', story: '빈 술잔 사이의 쪽지. “장부는 하역장으로.”', outdoors: true },
+  { id: 'freight-yard', name: '동부 하역장 · 7번 창고', subtitle: 'EAST FREIGHT · 03', story: '운송장에 찍힌 목적지. 폐쇄된 새벽역.', outdoors: true },
+  { id: 'last-platform', name: '새벽역 · 1번 승강장', subtitle: 'PLATFORM 01 · 04', story: '막차 대신 조직의 전동차가 들어온다.', outdoors: false },
+  { id: 'service-tunnel', name: '급행선 · 정비 터널', subtitle: 'SERVICE TUNNEL · 05', story: '전깃불이 끝나는 곳에, 다음 문이 있다.', outdoors: false },
+  { id: 'transfer-hall', name: '폐쇄 환승역 · 북쪽 출구', subtitle: 'NORTH TRANSFER · 06', story: '구겨진 장부 조각. 본부의 출입 암호가 남아 있다.', outdoors: false },
+  { id: 'headquarters-court', name: '백야 본부 · 정문 광장', subtitle: 'WHITE NIGHT HQ · 07', story: '철문 너머 경호차의 불빛. 돌아갈 길은 닫혔다.', outdoors: true },
+  { id: 'ledger-archive', name: '본부 회계동 · 장부 보관실', subtitle: 'LEDGER ARCHIVE · 08', story: '불타는 서류 사이에서 내 이름을 찾았다. 회장은 옥상 마당에 있다.', outdoors: false },
+  { id: 'dawn-courtyard', name: '마지막 마당 · 회장 백야', subtitle: 'FINAL CONFRONTATION · 09', story: '타이어가 젖은 돌바닥을 긁는다. 검은 차에서 마지막 증인이 내린다.', outdoors: true },
+];
+
 const choose = (rng, values) => values[Math.min(values.length - 1, Math.floor(rng() * values.length))];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -64,6 +78,7 @@ export function generateRoom(rng, index) {
   const boss = index === 8;
   const templateIndex = boss ? 8 : zoneIndex * 3 + Math.min(2, Math.floor(rng() * 3));
   const template = TEMPLATES[templateIndex];
+  const district = DISTRICTS[index];
   const width = 2800;
   // A shared horizontal offset preserves all platform reachability relations.
   const offset = boss ? 0 : Math.floor((rng() - 0.5) * 90);
@@ -79,11 +94,11 @@ export function generateRoom(rng, index) {
   const candidates = [];
   for (let x = 770; x <= width - 350; x += 145) {
     const px = x + Math.floor((rng() - 0.5) * 42);
-    if (!blocked(px, 640) && (!boss || Math.abs(px - 2110) > 160)) candidates.push({ x: px, y: 640 });
+    if (!blocked(px, 640) && (!boss || Math.abs(px - 900) > 180)) candidates.push({ x: px, y: 640 });
   }
   for (const p of platforms) {
     for (let x = p.x + 75; x < p.x + p.w - 35; x += 175) {
-      if (x >= 730 && !blocked(x, p.y)) candidates.push({ x, y: p.y });
+      if (x >= 730 && !blocked(x, p.y) && (!boss || Math.abs(x - 900) > 180)) candidates.push({ x, y: p.y });
     }
   }
   // Fisher–Yates avoids dependence on unstable Array.sort(random).
@@ -97,6 +112,10 @@ export function generateRoom(rng, index) {
     ['smg', 'shotgun', 'rusher', 'heavy', 'heavy', 'pistol'],
   ];
   const count = boss ? 4 : 4 + zoneIndex;
+  if (!boss) {
+    const firstArrival = candidates.filter(p => p.y === 640).sort((a, b) => a.x - b.x)[0];
+    if (firstArrival) spawnPoints.push({ ...firstArrival, type: 'pistol' });
+  }
   for (const point of candidates) {
     if (spawnPoints.length >= count) break;
     if (spawnPoints.some(s => Math.abs(s.x - point.x) < 90 && Math.abs(s.y - point.y) < 90)) continue;
@@ -105,9 +124,17 @@ export function generateRoom(rng, index) {
   }
   // Enemy types are introduced predictably; positions remain seed dependent.
   if (!boss && spawnPoints.length) spawnPoints[0].type = ['pistol', 'smg', 'shotgun', 'rusher', 'heavy', 'heavy', 'smg', 'heavy'][index];
-  if (boss) spawnPoints.push({ x: 2110, y: 640, type: 'boss' });
+  if (boss) spawnPoints.push({ x: 900, y: 640, type: 'boss' });
   return {
-    index, width, height: 720, theme: zone.id, name: template.name, story: template.story,
+    index, width, height: 720, theme: zone.id, name: district.name, story: district.story,
+    variant: index, layoutName: template.name,
+    landmark: { id: district.id, name: district.name, subtitle: district.subtitle },
+    weatherAllowed: district.outdoors,
+    shelters: district.outdoors ? [
+      { x: 80, y: 430, w: 360, h: 12 },
+      { x: 1360 + offset, y: 315, w: 290, h: 12 },
+      { x: 2070 + offset, y: 320, w: 310, h: 12 },
+    ] : [],
     platforms, covers, exit: { x: width - 135, y: 640 }, spawnPoints,
     weaponDrop: choose(rng, ['revolver', 'smg', 'shotgun', 'pistol']),
     cleared: false, boss,

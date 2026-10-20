@@ -1,4 +1,5 @@
 import { WEAPONS, UPGRADES, ZONES, ENEMY_TYPES, generateRoom } from './data.js';
+import { createEncounter, updateEncounters } from './encounters.js';
 
 export const WIDTH = 1280, HEIGHT = 720, GROUND = 640, STEP = 1 / 120;
 const SAVE_KEY = 'last-bullet-before-dawn-v1';
@@ -32,7 +33,9 @@ export class Game {
     this.mode = 'title'; this.room = null; this.player = null;
     this.roomIndex = 0; this.zoneIndex = 0; this.time = 0; this.kills = 0; this.score = 0;
     this.seed = 0; this.rng = seededRandom(1); this.camera = { x: 0 };
-    this.enemies = []; this.bullets = []; this.particles = []; this.pickups = [];
+    this.enemies = []; this.bullets = []; this.particles = []; this.pickups = []; this.arrivals = [];
+    this.weather = { intensity: 0, target: 0, timer: 10, elapsed: 0, kindlabel: '비 그침' };
+    this.weatherRng = seededRandom(7);
     this.rewardChoices = []; this.toast = { text: '', time: 0 }; this.notice = '';
     this.input = { keys: new Set(), mouse: { x: 850, y: 380, left: false, right: false }, pressed: new Set() };
     this.accumulator = 0; this.shake = 0; this.flash = 0; this.slowActive = false; this.hitStop = 0;
@@ -48,23 +51,25 @@ export class Game {
   getWeapon() { return this.player?.weapons[this.player.weaponIndex] || null; }
   getWeaponDef() { return WEAPONS[this.getWeapon()?.id] || WEAPONS.pistol; }
   magazine(id) { return Math.ceil(WEAPONS[id].magazine * (1 + this.stack('extendedMag') * 0.25)); }
-  createWeapon(id) { return { id, ammo: this.magazine(id), cooldown: 0, reload: 0, reloadTotal: 0, heat: 0 }; }
+  createWeapon(id) { return { id, ammo: this.magazine(id), cooldown: 0, reload: 0, reloadTotal: 0, heat: 0, durability: 100, wetness: 0, jammed: false, jamReason: '', clearProgress: 0, maintenance: 0 }; }
   startRun(seed) {
     this.seed = (seed ?? Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0; this.rng = seededRandom(this.seed);
+    this.weatherRng = seededRandom(this.seed ^ 0x6B24A3D1);
     this.roomIndex = 0; this.zoneIndex = 0; this.time = 0; this.kills = 0; this.score = 0;
     this.stats = { shots: 0, hits: 0, damageTaken: 0, roomsCleared: 0 }; this.endingSaved = false;
     this.player = { x: 150, y: GROUND, vx: 0, vy: 0, w: 30, h: 58, hp: 100, maxHp: 100, aim: 0, facing: 1, grounded: true, coyote: 0.1, jumpBuffer: 0, rollTime: 0, rollCooldown: 0, rollDir: 1, invuln: 0, slow: 100, maxSlow: 100, recoil: 0, weaponIndex: 0, weapons: [], upgrades: {}, hurt: 0, muzzle: 0, dodgeBuff: 0, reloadBuff: 0, swapBuff: 0, animation: 0 };
     this.player.weapons = [this.createWeapon('pistol')];
+    Object.assign(this.player, { crouching: false, sheltered: false, vaultTime: 0, vaultCooldown: 0, vault: null, maintenanceBlocked: false });
     this.clearInput(); this.shake = 0; this.flash = 0; this.hitStop = 0; this.accumulator = 0;
     this.loadRoom(0); this.mode = 'playing'; this.audio?.start(); this.audio?.setVolumes(this.settings.music, this.settings.sfx);
   }
   clearInput() { this.input.keys.clear(); this.input.pressed.clear(); this.input.mouse.left = false; this.input.mouse.right = false; this.slowActive = false; }
   pause() { if (this.mode === 'playing') { this.mode = 'paused'; this.clearInput(); this.accumulator = 0; } }
   resume() { if (this.mode === 'paused') { this.mode = 'playing'; this.clearInput(); this.accumulator = 0; } }
-  returnToTitle() { this.mode = 'title'; this.clearInput(); this.enemies = []; this.bullets = []; this.particles = []; this.pickups = []; this.room = null; this.player = null; this.accumulator = 0; }
+  returnToTitle() { this.mode = 'title'; this.clearInput(); this.enemies = []; this.bullets = []; this.particles = []; this.pickups = []; this.arrivals = []; this.room = null; this.player = null; this.accumulator = 0; }
   bindInput(canvas) {
     if (this.bound) return; this.bound = true;
-    const gameKeys = new Set(['KeyA', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyR', 'KeyQ', 'KeyE', 'Escape']);
+    const gameKeys = new Set(['KeyA', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyR', 'KeyQ', 'KeyE', 'KeyC', 'KeyF', 'Escape']);
     window.addEventListener('keydown', e => {
       if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
       if (gameKeys.has(e.code)) e.preventDefault();
@@ -76,8 +81,10 @@ export class Game {
     window.addEventListener('keyup', e => this.input.keys.delete(e.code));
     const pointer = e => { const r = canvas.getBoundingClientRect(); this.input.mouse.x = (e.clientX - r.left) * WIDTH / r.width; this.input.mouse.y = (e.clientY - r.top) * HEIGHT / r.height; };
     canvas.addEventListener('pointermove', pointer);
-    canvas.addEventListener('pointerdown', e => { if (this.mode !== 'playing') return; e.preventDefault(); pointer(e); if (e.button === 0) this.input.mouse.left = true; if (e.button === 2) this.input.mouse.right = true; this.audio?.start(); });
-    window.addEventListener('pointerup', e => { if (e.button === 0) this.input.mouse.left = false; if (e.button === 2) this.input.mouse.right = false; });
+    // Pointerdown only fires for the first pressed mouse button. Mouse events
+    // deliver every chord edge, so RMB focus + LMB fire work in either order.
+    canvas.addEventListener('mousedown', e => { if (this.mode !== 'playing') return; e.preventDefault(); pointer(e); if (e.button === 0) this.input.mouse.left = true; if (e.button === 2) this.input.mouse.right = true; this.audio?.start(); });
+    window.addEventListener('mouseup', e => { if (e.button === 0) this.input.mouse.left = false; if (e.button === 2) this.input.mouse.right = false; });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('blur', () => this.pause());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.pause(); });
@@ -99,23 +106,27 @@ export class Game {
   update(dt) {
     if (this.mode !== 'playing') return;
     const p = this.player;
-    for (const key of ['invuln', 'hurt', 'rollCooldown', 'muzzle', 'dodgeBuff', 'reloadBuff', 'swapBuff']) p[key] = Math.max(0, p[key] - dt);
+    for (const key of ['invuln', 'hurt', 'rollCooldown', 'vaultCooldown', 'muzzle', 'dodgeBuff', 'reloadBuff', 'swapBuff']) p[key] = Math.max(0, p[key] - dt);
     this.toast.time = Math.max(0, this.toast.time - dt); this.shake = Math.max(0, this.shake - dt * 24); this.flash = Math.max(0, this.flash - dt * 5);
     p.recoil = Math.max(0, p.recoil - dt * 8);
     const press = this.input.pressed;
     if (press.has('Space')) p.jumpBuffer = 0.13;
-    if (press.has('KeyR')) this.reload();
+    if (press.has('KeyR')) { if (this.getWeapon().jammed) this.clearJam(); else this.reload(); }
     if (press.has('KeyQ')) this.switchWeapon();
     if (press.has('KeyE')) this.interact();
     if (press.has('ShiftLeft') || press.has('ShiftRight')) this.roll();
+    if (press.has('KeyF')) this.vault();
     press.clear();
     if (this.mode !== 'playing') return;
     this.updatePlayer(dt);
+    this.updateWeather(dt);
+    this.updateWeaponCondition(dt);
+    updateEncounters(this, dt);
     for (const weapon of p.weapons) {
       weapon.cooldown = Math.max(0, weapon.cooldown - dt); weapon.heat = Math.max(0, weapon.heat - dt * 0.8);
       if (weapon.reload > 0) { weapon.reload = Math.max(0, weapon.reload - dt); if (weapon.reload === 0) { weapon.ammo = this.magazine(weapon.id); this.emitSound('reloadDone'); this.notify(`${WEAPONS[weapon.id].name} · 재장전 완료`, 1.2); } }
     }
-    if (this.input.mouse.left && p.rollTime <= 0) this.fire();
+    if (this.input.mouse.left && p.rollTime <= 0 && p.vaultTime <= 0) this.fire();
     for (const enemy of this.enemies) { if (this.mode !== 'playing') break; if (!enemy.dead) this.updateEnemy(enemy, dt); }
     if (this.mode !== 'playing') return;
     this.updateBullets(dt);
@@ -127,14 +138,31 @@ export class Game {
   }
   updatePlayer(dt) {
     const p = this.player, keys = this.input.keys;
-    p.aim = Math.atan2(this.input.mouse.y - (p.y - 38), this.input.mouse.x + this.camera.x - p.x);
+    if (p.vaultTime > 0) {
+      const v = p.vault; v.elapsed = Math.min(v.duration, v.elapsed + dt);
+      const position = this.vaultPosition(v, v.elapsed / v.duration);
+      // A new obstruction aborts the traversal instead of pushing through it.
+      if (this.room.covers.some(c => c.hp > 0 && this.rectOverlaps({ x: position.x - p.w / 2, y: position.y - p.h, w: p.w, h: p.h }, c))) {
+        p.vaultTime = 0; p.vault = null; p.vx = p.vy = 0;
+      } else {
+        p.x = position.x; p.y = position.y; p.vaultTime = Math.max(0, v.duration - v.elapsed);
+        p.vx = p.vy = 0; p.grounded = false;
+        if (p.vaultTime === 0) { p.vault = null; p.grounded = true; }
+        p.aim = Math.atan2(this.input.mouse.y - (p.y - 38), this.input.mouse.x + this.camera.x - p.x);
+        return;
+      }
+    }
+    const wantsCrouch = keys.has('KeyC') && p.grounded && p.rollTime <= 0;
+    const headBlocked = this.room.covers.some(c => c.hp > 0 && this.rectOverlaps({ x: p.x - p.w / 2, y: p.y - 58, w: p.w, h: 58 }, c));
+    p.crouching = wantsCrouch || (p.crouching && headBlocked); p.h = p.crouching ? 34 : 58;
+    p.aim = Math.atan2(this.input.mouse.y - (p.y - (p.crouching ? 21 : 38)), this.input.mouse.x + this.camera.x - p.x);
     p.facing = Math.cos(p.aim) >= 0 ? 1 : -1;
     p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - dt);
     p.jumpBuffer = Math.max(0, p.jumpBuffer - dt);
-    if (p.jumpBuffer > 0 && p.coyote > 0 && p.rollTime <= 0) { p.vy = -760; p.grounded = false; p.coyote = 0; p.jumpBuffer = 0; this.burst(p.x, p.y, 5, '#828b91', 'smoke'); }
+    if (p.jumpBuffer > 0 && p.coyote > 0 && p.rollTime <= 0 && !headBlocked) { p.crouching = false; p.h = 58; p.vy = -760; p.grounded = false; p.coyote = 0; p.jumpBuffer = 0; this.burst(p.x, p.y, 5, '#828b91', 'smoke'); }
     const move = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
     if (p.rollTime > 0) { p.rollTime = Math.max(0, p.rollTime - dt); p.vx = p.rollDir * 670; if (p.rollTime === 0) p.dodgeBuff = 1.2; }
-    else p.vx = approach(p.vx, move * 310 * (1 + 0.1 * this.stack('quickFeet')), (p.grounded ? 2500 : 1700) * dt);
+    else p.vx = approach(p.vx, move * (p.crouching ? 130 : 310) * (this.getWeapon().maintenance > 0.25 ? 0.45 : 1) * (1 + 0.1 * this.stack('quickFeet')), (p.grounded ? 2500 : 1700) * dt);
     p.animation += Math.abs(p.vx) * dt / 42;
     this.moveActor(p, dt);
   }
@@ -153,37 +181,115 @@ export class Game {
   }
   roll() {
     const p = this.player;
-    if (p.rollCooldown > 0 || p.rollTime > 0) return false;
+    if (p.rollCooldown > 0 || p.rollTime > 0 || p.vaultTime > 0) return false;
     p.rollDir = (this.input.keys.has('KeyD') ? 1 : 0) - (this.input.keys.has('KeyA') ? 1 : 0) || p.facing;
     p.rollTime = 0.28; p.rollCooldown = 1.25 * (1 - this.stack('quickFeet') * 0.15); p.invuln = Math.max(p.invuln, 0.24);
     this.emitSound('roll'); this.burst(p.x, p.y - 10, 8, '#7f8c98', 'smoke'); return true;
   }
+  rectOverlaps(a, b) { return a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 && a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01; }
+  vaultPosition(v, t) {
+    const smooth = n => n * n * (3 - 2 * n);
+    if (t < 0.32) return { x: v.startX, y: v.startY + (v.topY - v.startY) * smooth(t / 0.32) };
+    if (t < 0.75) return { x: v.startX + (v.endX - v.startX) * smooth((t - 0.32) / 0.43), y: v.topY };
+    return { x: v.endX, y: v.topY + (v.endY - v.topY) * smooth((t - 0.75) / 0.25) };
+  }
+  vault() {
+    const p = this.player;
+    if (!p.grounded || p.rollTime > 0 || p.vaultTime > 0 || p.vaultCooldown > 0) return false;
+    const dir = (this.input.keys.has('KeyD') ? 1 : 0) - (this.input.keys.has('KeyA') ? 1 : 0) || p.facing;
+    const candidates = this.room.covers.filter(c => c.hp > 0 && p.y - c.y >= 12 && p.y - c.y <= 100 && c.w <= 130)
+      .map(c => ({ c, gap: dir > 0 ? c.x - (p.x + p.w / 2) : p.x - p.w / 2 - (c.x + c.w) }))
+      .filter(item => item.gap >= -0.1 && item.gap <= 54).sort((a, b) => a.gap - b.gap);
+    const obstacle = candidates[0]?.c;
+    if (!obstacle) { this.notify('낮은 상자나 담 가까이에서 F · 높이 100 이하', 1.3); return false; }
+    const endX = dir > 0 ? obstacle.x + obstacle.w + p.w / 2 + 10 : obstacle.x - p.w / 2 - 10;
+    if (endX < p.w / 2 + 8 || endX > this.room.width - p.w / 2 - 8) return false;
+    const v = { startX: p.x, startY: p.y, endX, endY: p.y, topY: obstacle.y - 8, duration: 0.55, elapsed: 0 };
+    for (let sample = 0; sample <= 40; sample++) {
+      const point = this.vaultPosition(v, sample / 40), rect = { x: point.x - p.w / 2, y: point.y - 58, w: p.w, h: 58 };
+      if (this.room.covers.some(c => c.hp > 0 && this.rectOverlaps(rect, c))) { this.notify('넘어갈 공간이 부족합니다', 1.2); return false; }
+    }
+    p.crouching = false; p.h = 58; p.vault = v; p.vaultTime = v.duration; p.vaultCooldown = 1.1; p.vx = p.vy = 0;
+    this.emitSound('roll'); return true;
+  }
+  updateWeather(dt) {
+    const w = this.weather, p = this.player;
+    w.elapsed += dt;
+    if (!this.room.weatherAllowed) { w.intensity = w.target = 0; w.kindlabel = '실내 · 비 없음'; }
+    else {
+      w.timer -= dt;
+      if (w.timer <= 0) {
+        w.target = w.target > 0 ? 0 : 0.65 + this.weatherRng() * 0.35;
+        w.timer = w.target > 0 ? 16 + this.weatherRng() * 10 : 22 + this.weatherRng() * 20;
+        this.notify(w.target > 0 ? '소나기 · 차양 아래에서 총기를 보호하세요' : '비가 잦아든다 · 젖은 총을 정비할 시간', 3);
+      }
+      w.intensity = approach(w.intensity, w.target, dt * 0.28);
+      w.kindlabel = w.intensity > 0.15 ? '소나기' : '비 그침';
+    }
+    p.sheltered = !this.room.weatherAllowed || (this.room.shelters || []).some(s => p.x >= s.x && p.x <= s.x + s.w && p.y - p.h >= s.y);
+  }
+  jamWeapon(weapon, reason) {
+    if (weapon.jammed) return;
+    weapon.jammed = true; weapon.jamReason = reason; weapon.clearProgress = 0; weapon.maintenance = 0; weapon.reload = 0;
+    this.emitSound('reload');
+    if (weapon === this.getWeapon()) this.notify(`${reason === 'rain' ? '빗물 유입' : '총기 마모'} · 작동 불량! R을 5번 눌러 복구`, 4);
+  }
+  clearJam() {
+    const weapon = this.getWeapon();
+    if (!weapon?.jammed) return false;
+    weapon.clearProgress = Math.min(5, weapon.clearProgress + 1); this.emitSound('reload');
+    if (weapon.clearProgress < 5) { this.notify(`총기 복구 ${weapon.clearProgress}/5 · R 연타`, 1.5); return false; }
+    weapon.jammed = false; weapon.jamReason = ''; weapon.clearProgress = 0;
+    weapon.wetness = Math.min(30, weapon.wetness); weapon.durability = Math.max(35, weapon.durability);
+    this.player.maintenanceBlocked = true;
+    this.notify('작동 복구 · 내구도는 R을 길게 눌러 정비', 2.5); this.emitSound('reloadDone'); return true;
+  }
+  updateWeaponCondition(dt) {
+    const p = this.player, active = this.getWeapon(), held = this.input.keys.has('KeyR');
+    if (!held) p.maintenanceBlocked = false;
+    for (const weapon of p.weapons) {
+      const exposed = weapon === active && !p.sheltered && this.weather.intensity > 0.05;
+      const previousWetness = weapon.wetness;
+      weapon.wetness = clamp(weapon.wetness + dt * (exposed ? this.weather.intensity * 7 : weapon === active ? -8 : -3), 0, 100);
+      if (weapon === active && previousWetness < 65 && weapon.wetness >= 65 && !weapon.jammed) this.notify('총이 젖고 있습니다 · 차양으로 이동하거나 R을 길게 눌러 정비', 3);
+      if (weapon.wetness >= 85) this.jamWeapon(weapon, 'rain');
+      if (weapon !== active || !held || weapon.jammed || p.maintenanceBlocked || p.rollTime > 0 || p.vaultTime > 0 || (weapon.durability >= 100 && weapon.wetness <= 0)) { weapon.maintenance = 0; continue; }
+      weapon.maintenance += dt;
+      if (weapon.maintenance >= 1.4) {
+        weapon.durability = 100; weapon.wetness = Math.max(0, weapon.wetness - 45); weapon.maintenance = 0;
+        p.maintenanceBlocked = true; this.notify('현장 정비 완료 · 내구도 100 / 젖음 −45', 2); this.emitSound('reloadDone');
+      }
+    }
+  }
   reload() {
-    const weapon = this.getWeapon(); if (!weapon || weapon.reload > 0 || weapon.ammo >= this.magazine(weapon.id)) return false;
+    const weapon = this.getWeapon(); if (!weapon || weapon.jammed || weapon.reload > 0 || weapon.ammo >= this.magazine(weapon.id)) return false;
     weapon.reloadTotal = WEAPONS[weapon.id].reload * (this.player.reloadBuff > 0 ? 1 - 0.2 * this.stack('quickReload') : 1);
     weapon.reload = weapon.reloadTotal; this.emitSound('reload'); this.notify('재장전 중 · 예비 탄약 무제한', 1); return true;
   }
   switchWeapon() {
     const p = this.player; if (p.weapons.length < 2) { this.notify('무기를 발견하면 E로 획득하세요', 1.5); return false; }
+    this.getWeapon().maintenance = 0; p.maintenanceBlocked = this.input.keys.has('KeyR');
     p.weaponIndex = 1 - p.weaponIndex; p.swapBuff = 2; this.emitSound('pickup'); this.notify(`${this.getWeaponDef().name} · 무기 교체`, 1.1); return true;
   }
   fire() {
     const p = this.player, weapon = this.getWeapon(), def = WEAPONS[weapon.id];
-    if (weapon.cooldown > 0 || weapon.reload > 0) return false;
+    if (weapon.cooldown > 0 || weapon.reload > 0 || weapon.jammed || weapon.maintenance > 0.25 || p.vaultTime > 0) return false;
+    if (weapon.durability <= 0) { this.jamWeapon(weapon, 'wear'); return false; }
     if (weapon.ammo <= 0) { this.reload(); return false; }
     const last = weapon.ammo === 1;
     const dodgeBonus = p.dodgeBuff > 0 ? 0.45 * this.stack('dodgeShot') : 0;
     const damage = def.damage * (1 + 0.15 * this.stack('heavyRounds') + (last ? 0.45 * this.stack('lastRound') : 0) + dodgeBonus);
     weapon.ammo--; weapon.cooldown = def.interval * (p.swapBuff > 0 && this.stack('swapFrenzy') ? 0.75 : 1); weapon.heat = Math.min(1, weapon.heat + 0.12);
+    weapon.durability = Math.max(0, weapon.durability - (def.wear ?? 0.22));
     const spread = def.spread * (weapon.id === 'smg' ? 0.5 + weapon.heat : 1) * (this.slowActive ? 1 - 0.35 * this.stack('slowFocus') : 1);
     p.recoil = def.recoil; p.muzzle = 0.065; p.dodgeBuff = 0; this.stats.shots++;
     // Sweep from the shoulder: a muzzle protruding through thin cover must not bypass it.
-    const origin = { x: p.x, y: p.y - 38 };
+    const origin = { x: p.x, y: p.y - (p.crouching ? 21 : 38) };
     for (let i = 0; i < def.pellets; i++) {
       const angle = p.aim + (this.rng() - 0.5) * spread * 2;
       this.bullets.push({ id: this.nextBulletId++, x: origin.x, y: origin.y, px: origin.x, py: origin.y, vx: Math.cos(angle) * def.speed, vy: Math.sin(angle) * def.speed, owner: 'player', damage, radius: 2.5, life: def.range / def.speed, color: def.color || '#f8dc93', trail: 24, pierce: this.stack('pierce'), hitIds: new Set(), travel: 0, weaponId: weapon.id, originX: p.x, originY: p.y });
     }
-    this.particles.push({ x: p.x, y: p.y - 38, vx: -p.facing * (65 + this.rng() * 70), vy: -110 - this.rng() * 80, life: 0.7, maxLife: 0.7, size: 3, color: '#b5a47d', type: 'shell' });
+    this.particles.push({ x: p.x, y: origin.y, vx: -p.facing * (65 + this.rng() * 70), vy: -110 - this.rng() * 80, life: 0.7, maxLife: 0.7, size: 3, color: '#b5a47d', type: 'shell' });
     this.shake = Math.max(this.shake, weapon.id === 'shotgun' ? 6 : weapon.id === 'revolver' ? 4 : 1.5);
     this.emitSound(weapon.id); if (weapon.ammo === 0) this.notify('탄창 소진 · R 재장전', 1.3); return true;
   }
@@ -241,29 +347,7 @@ export class Game {
     const enemy = { ...def, type: point.type, id: this.nextEnemyId++, x: point.x, y: point.y, vx: 0, vy: 0, hp: def.hp, maxHp: def.hp, aim: Math.PI, facing: -1, state: 'idle', timer: 0.5 + this.rng() * 1.1, flash: 0, muzzle: 0, phase: 1, pattern: 'fan', patternIndex: 0, spawnTime: warning, grounded: true, dead: false, attackHit: false, burstLeft: 0, shotTimer: 0, windupTotal: def.windup, animation: 0 };
     this.enemies.push(enemy); return enemy;
   }
-  spawnWave() {
-    const pool = this.zoneIndex === 0 ? ['pistol', 'smg', 'rusher', 'shotgun'] : ['pistol', 'smg', 'shotgun', 'rusher', 'heavy'];
-    const points = this.room.spawnPoints;
-    for (let i = 0; i < points.length; i++) {
-      let point = { ...points[i] };
-      if (this.room.wave > 1) {
-        point.type = pool[Math.floor(this.rng() * pool.length)];
-        if (Math.abs(point.x - this.player.x) < 480 || this.enemies.some(e => Math.abs(e.x - point.x) < 90 && Math.abs(e.y - point.y) < 85)) {
-          const options = [];
-          for (let x = 420; x < this.room.width - 160; x += 130) {
-            if (Math.abs(x - this.player.x) < 480) continue;
-            if (this.room.covers.some(c => x + 28 > c.x && x - 28 < c.x + c.w)) continue;
-            if (this.enemies.some(e => Math.abs(e.x - x) < 90 && e.y > 550)) continue;
-            options.push(x);
-          }
-          if (options.length) { point.x = options[Math.floor(this.rng() * options.length)]; point.y = GROUND; }
-          else continue;
-        }
-      }
-      this.spawnEnemy(point, this.room.wave === 1 ? 0.9 : 1.4);
-    }
-    if (this.room.wave > 1) this.notify(`발소리가 가까워진다 · 증원 ${this.room.wave}/${this.room.totalWaves}`, 2.5);
-  }
+  spawnWave() { createEncounter(this); }
   enemyShot(e, angle, { count = 1, spread = 0, speed = 370, damage = e.damage } = {}) {
     e.muzzle = 0.08;
     const x = e.x, y = e.y - e.h * 0.65;
@@ -276,7 +360,7 @@ export class Game {
   updateEnemy(e, dt) {
     e.flash = Math.max(0, e.flash - dt); e.muzzle = Math.max(0, e.muzzle - dt);
     if (e.spawnTime > 0) { e.spawnTime = Math.max(0, e.spawnTime - dt); return; }
-    const p = this.player, dx = p.x - e.x, dy = p.y - 34 - (e.y - e.h * 0.65), dist = Math.hypot(dx, dy);
+    const p = this.player, dx = p.x - e.x, dy = p.y - (p.crouching ? 19 : 34) - (e.y - e.h * 0.65), dist = Math.hypot(dx, dy);
     e.facing = dx >= 0 ? 1 : -1;
     if (e.state !== 'windup' && e.state !== 'attack') e.aim = Math.atan2(dy, dx);
     e.timer -= dt;
@@ -290,7 +374,7 @@ export class Game {
     } else if (e.state === 'windup') {
       e.vx = 0;
       // Lock aim for the final 0.32 seconds, so the tell gives a real dodge window.
-      if (e.timer > 0.32) e.aim = Math.atan2(dy, dx);
+      if (e.timer > 0.32) { e.aim = Math.atan2(dy, dx); e.lockedAim = e.aim; }
       if (e.timer <= 0) {
         e.state = 'attack'; e.lockedAim = e.aim; e.attackHit = false;
         if (e.type === 'rusher') { e.timer = 0.36; e.chargeDir = Math.cos(e.lockedAim) >= 0 ? 1 : -1; }
@@ -313,15 +397,15 @@ export class Game {
     }
     if (e.state === 'idle') {
       e.vx = Math.abs(dx) > 850 ? Math.sign(dx) * 80 : 0;
-      if (e.timer <= 0 && dist < 1800) { e.pattern = ['fan', 'focus', 'rush'][e.patternIndex++ % 3]; e.state = 'windup'; e.timer = e.pattern === 'focus' ? 1.15 : 0.95; e.windupTotal = e.timer; e.lockedAim = e.aim; e.vx = 0; }
+      if (e.timer <= 0 && dist < 1800) { e.pattern = ['fan', 'focus', 'rush'][e.patternIndex++ % 3]; e.state = 'windup'; e.timer = e.pattern === 'focus' ? 1.15 : 0.95; e.windupTotal = e.timer; e.lockedAim = e.aim; e.chargeDir = e.x > this.room.width / 2 ? -1 : 1; e.vx = 0; }
     } else if (e.state === 'windup') {
       e.vx = 0;
-      if (e.timer > 0.4) e.aim = Math.atan2(this.player.y - 34 - (e.y - e.h * 0.65), dx);
+      if (e.timer > 0.4) { e.aim = Math.atan2(this.player.y - (this.player.crouching ? 19 : 34) - (e.y - e.h * 0.65), dx); e.lockedAim = e.aim; }
       if (e.timer <= 0) {
         e.state = 'attack'; e.lockedAim = e.aim; e.shotTimer = 0;
         e.burstLeft = e.pattern === 'fan' ? (e.phase === 2 ? 3 : 2) : e.pattern === 'focus' ? (e.phase === 2 ? 9 : 6) : 0;
         e.timer = e.pattern === 'rush' ? 0.8 : e.pattern === 'fan' ? 1.05 : 1.5;
-        if (e.pattern === 'rush') { e.chargeDir = e.x > this.room.width / 2 ? -1 : 1; e.vy = -300; }
+        if (e.pattern === 'rush') { e.chargeDir ||= e.x > this.room.width / 2 ? -1 : 1; e.vy = -300; }
       }
     } else if (e.state === 'attack') {
       e.vx = e.pattern === 'rush' ? e.chargeDir * (e.phase === 2 ? 620 : 480) : 0;
@@ -357,13 +441,16 @@ export class Game {
   loadRoom(index) {
     this.roomIndex = index; this.zoneIndex = Math.floor(index / 3); this.room = generateRoom(this.rng, index);
     this.room.enteredAt = this.time;
-    this.enemies = []; this.bullets = []; this.particles = []; this.pickups = []; this.rewardChoices = [];
+    this.enemies = []; this.bullets = []; this.particles = []; this.pickups = []; this.rewardChoices = []; this.arrivals = []; this.bossIntro = null;
     this.room.cleared = false; this.room.rewardTaken = false; this.room.wave = 1; this.room.totalWaves = this.room.boss ? 1 : 3;
     this.player.x = 150; this.player.y = GROUND; this.player.vx = this.player.vy = 0; this.player.invuln = 1; this.camera.x = 0; this.waveDelay = 0;
     this.player.rollTime = 0; this.player.rollCooldown = 0; this.player.jumpBuffer = 0; this.player.grounded = true; this.player.coyote = 0.1;
+    Object.assign(this.player, { crouching: false, h: 58, vault: null, vaultTime: 0, vaultCooldown: 0, sheltered: false, maintenanceBlocked: false });
+    for (const weapon of this.player.weapons) weapon.maintenance = 0;
+    this.weather = { intensity: 0, target: 0, timer: 7 + this.weatherRng() * 8, elapsed: 0, kindlabel: this.room.weatherAllowed ? '비 그침' : '실내 · 비 없음' };
     this.spawnWave();
     if (index === 0) this.pickups.push({ type: 'weapon', weaponId: ['revolver', 'smg', 'shotgun'][Math.floor(this.rng() * 3)], x: 315, y: GROUND });
-    this.notice = this.room.story || ''; this.notify(`${ZONES[this.zoneIndex].name} · ${this.room.name}`, 3.5);
+    this.notice = this.room.story || ''; this.notify(this.room.boss ? '타이어가 비명을 지른다 · 백야의 차가 들어온다' : `${ZONES[this.zoneIndex].name} · ${this.room.name}`, this.room.boss ? 4.5 : 3.5);
   }
   interact() {
     if (this.mode !== 'playing') return false;
@@ -372,10 +459,21 @@ export class Game {
     if (pickup) {
       if (pickup.type === 'health') { if (p.hp >= p.maxHp) { this.notify('체력이 가득 찼습니다'); return false; } p.hp = Math.min(p.maxHp, p.hp + pickup.amount); }
       else {
+        const incoming = pickup.weaponState ? { ...pickup.weaponState, maintenance: 0, reload: 0, cooldown: 0 } : this.createWeapon(pickup.weaponId);
         const existing = p.weapons.find(w => w.id === pickup.weaponId);
-        if (existing) { existing.ammo = this.magazine(existing.id); existing.reload = 0; this.notify(`${WEAPONS[existing.id].name} · 탄창 보충`); }
-        else if (p.weapons.length < 2) { p.weapons.push(this.createWeapon(pickup.weaponId)); p.weaponIndex = p.weapons.length - 1; p.swapBuff = 2; this.notify(`${WEAPONS[pickup.weaponId].name} 획득 · Q 무기 교체`); }
-        else { const dropped = this.getWeapon().id; p.weapons[p.weaponIndex] = this.createWeapon(pickup.weaponId); this.pickups.push({ type: 'weapon', weaponId: dropped, x: pickup.x - 35, y: pickup.y }); p.swapBuff = 2; this.notify(`${WEAPONS[pickup.weaponId].name} 획득 · 기존 무기를 내려놓았습니다`); }
+        if (existing) {
+          existing.ammo = Math.min(this.magazine(existing.id), Math.max(existing.ammo, incoming.ammo)); existing.reload = 0;
+          existing.durability = Math.max(existing.durability, incoming.durability); existing.wetness = Math.min(existing.wetness, incoming.wetness);
+          existing.jammed = existing.jammed && incoming.jammed; if (!existing.jammed) { existing.jamReason = ''; existing.clearProgress = 0; }
+          this.notify(`${WEAPONS[existing.id].name} · 탄약과 양호한 부품 확보`);
+        }
+        else if (p.weapons.length < 2) { p.weapons.push(incoming); p.weaponIndex = p.weapons.length - 1; p.swapBuff = 2; this.notify(`${WEAPONS[pickup.weaponId].name} 획득 · Q 무기 교체`); }
+        else {
+          const dropped = { ...this.getWeapon(), reload: 0, cooldown: 0, maintenance: 0 };
+          p.weapons[p.weaponIndex] = incoming; this.pickups.push({ type: 'weapon', weaponId: dropped.id, weaponState: dropped, x: pickup.x - 35, y: pickup.y }); p.swapBuff = 2;
+          this.notify(`${WEAPONS[pickup.weaponId].name} 획득 · 기존 무기를 내려놓았습니다`);
+        }
+        p.maintenanceBlocked = this.input.keys.has('KeyR');
       }
       this.pickups.splice(this.pickups.indexOf(pickup), 1); this.emitSound('pickup'); return true;
     }

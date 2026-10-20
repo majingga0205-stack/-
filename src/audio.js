@@ -1,7 +1,7 @@
 /** Local, gesture-unlocked Web Audio. No samples, downloads, or wall-clock timers. */
 const clamp = value => Math.max(0, Math.min(1, Number(value) || 0));
 const midi = note => 440 * Math.pow(2, (note - 69) / 12);
-const COMBAT_SOUNDS = new Set(['pistol', 'revolver', 'smg', 'shotgun', 'shot', 'gun', 'hit', 'kill', 'hurt', 'roll', 'reload', 'reloadDone', 'empty']);
+const COMBAT_SOUNDS = new Set(['pistol', 'revolver', 'smg', 'shotgun', 'shot', 'gun', 'hit', 'kill', 'hurt', 'roll', 'reload', 'reloadDone', 'empty', 'engine', 'skid', 'trainBrake', 'arrivalDoor']);
 
 export class AudioEngine {
   constructor() {
@@ -13,6 +13,7 @@ export class AudioEngine {
     this.beat = 0;
     this.activeNodes = new Set();
     this.rain = null;
+    this.weatherIntensity = 0;
     this.enabled = true;
   }
 
@@ -57,6 +58,15 @@ export class AudioEngine {
     const now = this.context.currentTime;
     this.musicBus.gain.setTargetAtTime(this.musicVolume, now, 0.04);
     this.sfxBus.gain.setTargetAtTime(this.sfxVolume, now, 0.02);
+  }
+
+  setWeather(intensity) {
+    const next = clamp(intensity);
+    if (Math.abs(next - this.weatherIntensity) < 0.0001) return;
+    this.weatherIntensity = next;
+    if (this.context && this.rainEnvelope) {
+      this.rainEnvelope.gain.setTargetAtTime(next * 0.055, this.context.currentTime, 0.12);
+    }
   }
 
   _track(node, ends, cleanup = []) {
@@ -117,12 +127,13 @@ export class AudioEngine {
     source.loop = true;
     filter.type = 'lowpass';
     filter.frequency.value = 1700;
-    envelope.gain.value = 0.035;
+    envelope.gain.value = this.weatherIntensity * 0.055;
     source.connect(filter);
     filter.connect(envelope);
-    envelope.connect(this.musicBus);
+    envelope.connect(this.sfxBus);
     source.start();
     this.rain = source;
+    this.rainEnvelope = envelope;
     this.rainNodes = [filter, envelope];
   }
 
@@ -158,6 +169,19 @@ export class AudioEngine {
         noise(0.055, 0.18, 3400); tone(740, 0.055, 0.10, 'triangle'); tone(1050, 0.08, 0.07, 'triangle', 0.045); break;
       case 'empty':
         noise(0.035, 0.09, 4200); tone(280, 0.025, 0.04, 'square'); break;
+      case 'engine':
+        // Low mechanical rev, kept short so an arrival cannot leave a loop behind.
+        tone(52, 0.95, 0.16, 'sawtooth', 0, 108); tone(104, 0.75, 0.055, 'triangle', 0, 160);
+        noise(0.85, 0.12, 310, 0, 'lowpass'); break;
+      case 'skid':
+        noise(0.62, 0.23, 1800); tone(860, 0.48, 0.055, 'sawtooth', 0, 430);
+        noise(0.32, 0.11, 3400, 0.12); break;
+      case 'trainBrake':
+        noise(0.80, 0.20, 2100); tone(1430, 0.72, 0.035, 'sine', 0, 610);
+        tone(240, 0.48, 0.07, 'triangle', 0.1, 55); break;
+      case 'arrivalDoor':
+        noise(0.14, 0.17, 520); tone(95, 0.14, 0.10, 'triangle', 0, 40);
+        noise(0.06, 0.08, 2400, 0.11); break;
       case 'pickup':
         tone(392, 0.12, 0.13, 'triangle'); tone(587, 0.16, 0.10, 'triangle', 0.07); break;
       case 'upgrade':
@@ -228,6 +252,7 @@ export class AudioEngine {
     if (this.context) this.context.close().catch(() => {});
     this.context = null;
     this.rain = null;
+    this.rainEnvelope = null;
     this.beat = 0;
   }
 }

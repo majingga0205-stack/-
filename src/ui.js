@@ -143,9 +143,11 @@ export class GameUI {
       const controls = [
         ['좌우 이동', ['A', 'D']], ['점프', ['Space']], ['조준', ['마우스 이동']], ['사격', ['좌클릭 유지']],
         ['재장전', ['R']], ['회피 구르기', ['Shift']], ['무기 교체', ['Q']], ['슬로모션', ['우클릭 유지']],
+        ['웅크리기', ['C 유지']], ['낮은 담 · 상자 넘기', ['F']],
+        ['총기 고장 해제', ['R 5회 연타']], ['총기 정비', ['R 1.4초 유지']],
         ['획득 · 출구', ['E']], ['일시정지', ['Esc']],
       ];
-      body.innerHTML = `<div class="controls-grid">${controls.map(([label, keys]) => `<div class="control-row"><span>${label}</span><span class="control-keys">${keys.map(key => `<kbd>${key}</kbd>`).join('')}</span></div>`).join('')}</div><div class="control-tip"><b>움직이는 방향과 조준은 독립적입니다.</b> 뒤로 물러나며 쏘고, 점프해서 엄폐물 너머를 노리세요.<br>회피는 잠깐 무적이며 준비 상태가 표시됩니다. 집중 게이지는 적을 처치하면 회복됩니다.<br><b>방의 모든 적 처치 → 강화 선택 → 오른쪽 출구에서 E.</b> 무기는 최대 2개, 예비 탄약은 무제한입니다. 3개 구역, 9개 방 끝의 장부를 찾으세요.</div>`;
+      body.innerHTML = `<div class="controls-grid">${controls.map(([label, keys]) => `<div class="control-row"><span>${label}</span><span class="control-keys">${keys.map(key => `<kbd>${key}</kbd>`).join('')}</span></div>`).join('')}</div><div class="control-tip"><b>우클릭 + 좌클릭을 함께 누르면 슬로모션 중 사격합니다.</b> 이동과 조준은 독립적입니다. C로 상자 뒤에 숨고, 가까운 낮은 장애물은 바라보는 쪽으로 F를 눌러 넘으세요.<br><b>총기 관리:</b> 내구도 15% 이하는 마모 경고, 0%에서 고장. 비에 젖음 85%가 되어도 고장납니다. 고장은 <b>R을 눌렀다 떼기 5회</b>로 해제합니다. 길게 누르기는 연타에 포함되지 않습니다. 고장이 없을 때 R을 1.4초 누르면 내구도 100%로 정비하고 일부 건조합니다. 지붕 아래나 비가 그쳤을 때 젖음이 줄어듭니다.<br>회피는 잠깐 무적입니다. 집중 게이지는 적 처치 시 회복됩니다. 무기는 최대 2개, 예비 탄약은 무제한입니다.<br><b>적 처치 → 강화 선택 → 오른쪽 출구에서 E.</b> 3개 구역, 9번째 방에서 보스와 맞서세요.</div>`;
     } else if (this.panel === 'settings') {
       this.text('panel-title', '밤의 감도');
       this.text('panel-overline', 'PREFERENCES / 설정');
@@ -165,7 +167,7 @@ export class GameUI {
       const upgrades = UPGRADES.filter(upgrade => (this.game.player?.upgrades[upgrade.id] || 0) > 0);
       body.innerHTML = upgrades.length ? `<div class="upgrade-list">${upgrades.map(upgrade => `<div class="upgrade-item"><span class="upgrade-item-icon" aria-hidden="true">${escapeHTML(upgrade.icon)}</span><div class="upgrade-item-info"><div class="upgrade-item-header"><span>${escapeHTML(upgrade.name)}</span><span>${stackLabel(this.game.player.upgrades[upgrade.id], upgrade.maxStacks)}</span></div><p>${escapeHTML(upgrade.description)}</p></div></div>`).join('')}</div>` : '<div class="empty-upgrades"><span aria-hidden="true">◇</span><strong>아직, 빈손이다.</strong>전투 방을 클리어하면 무작위 강화 3개 중<br>하나를 선택할 수 있습니다.</div>';
       if (this.game.player?.weapons.length) {
-        body.innerHTML += `<div class="arsenal-heading">보유 무기 <span>최대 2개 · Q로 교체</span></div><div class="upgrade-list">${this.game.player.weapons.map((weapon, index) => { const def = WEAPONS[weapon.id]; return `<div class="upgrade-item arsenal-item"><span class="upgrade-item-icon" aria-hidden="true">${index + 1}</span><div class="upgrade-item-info"><div class="upgrade-item-header"><span>${escapeHTML(def.name)}</span><span>${index === this.game.player.weaponIndex ? '사용 중' : '보조 무기'}</span></div><p>${escapeHTML(def.tag)} · 피해 ${def.damage}${def.pellets > 1 ? ` × ${def.pellets}` : ''} · 재장전 ${def.reload}초<br>${escapeHTML(def.description)}</p></div></div>`; }).join('')}</div>`;
+        body.innerHTML += `<div class="arsenal-heading">보유 무기 <span>최대 2개 · Q로 교체</span></div><div class="upgrade-list">${this.game.player.weapons.map((weapon, index) => { const def = WEAPONS[weapon.id]; return `<div class="upgrade-item arsenal-item"><span class="upgrade-item-icon" aria-hidden="true">${index + 1}</span><div class="upgrade-item-info"><div class="upgrade-item-header"><span>${escapeHTML(def.name)}</span><span>${index === this.game.player.weaponIndex ? '사용 중' : '보조 무기'}</span></div><p>${escapeHTML(def.tag)} · 피해 ${def.damage}${def.pellets > 1 ? ` × ${def.pellets}` : ''} · 재장전 ${def.reload}초<br>내구도 ${Math.round(weapon.durability ?? 100)}% · 젖음 ${Math.round(weapon.wetness ?? 0)}%${weapon.jammed ? ` · ${weapon.jamReason === 'rain' ? '침수' : '마모'} 고장 — R 5회 연타` : ''}<br>${escapeHTML(def.description)}</p></div></div>`; }).join('')}</div>`;
       }
     }
     body.scrollTop = 0;
@@ -226,9 +228,10 @@ export class GameUI {
     this.text('session-status', status[mode] || `${ZONES[game.zoneIndex]?.name || ''} · ${game.room?.name || ''}`);
     if (!game.player || !game.room) return;
     if (this.seenRoom !== game.room) { this.seenRoom = game.room; this.roomEnteredTime = game.time; }
-    this.text('story-caption', game.room.story || '');
-    this.visible('story-caption', Boolean(game.room.story) && game.time - this.roomEnteredTime < 7 && !game.room.cleared);
     const player = game.player, weapon = game.getWeapon(), def = WEAPONS[weapon.id];
+    const bossArrival = game.arrivals?.find(arrival => arrival.kind === 'bossCar' && arrival.elapsed < arrival.duration);
+    this.text('story-caption', bossArrival ? '브레이크 소리. 검은 차 한 대. 백야가 도착했다.' : game.room.story || '');
+    this.visible('story-caption', Boolean(bossArrival) || (Boolean(game.room.story) && game.time - this.roomEnteredTime < 7 && !game.room.cleared));
     this.text('health-number', `${Math.ceil(player.hp)} / ${player.maxHp}`);
     this.fill('health-fill', player.hp / player.maxHp);
     this.text('health-alert', player.hp <= player.maxHp * 0.25 ? '위험 · 엄폐하고 회피하세요' : player.hurt > 0 ? '피격' : '');
@@ -236,6 +239,10 @@ export class GameUI {
     this.node('game-hud').classList.toggle('slow-active', game.slowActive);
     this.node('game-hud').classList.toggle('ammo-empty', weapon.ammo === 0);
     this.text('area-name', `${String(game.zoneIndex + 1).padStart(2, '0')} / ${ZONES[game.zoneIndex].name}`);
+    this.text('room-landmark', game.room.landmark?.name || game.room.name);
+    const raining = (game.weather?.intensity || 0) > 0.05;
+    this.text('weather-status', `${game.weather?.kindlabel || (raining ? '비' : '비 그침')}${player.sheltered && raining ? ' · 지붕 아래' : ''}`);
+    this.node('weather-status').classList.toggle('sheltered', Boolean(player.sheltered && raining));
     const alive = game.enemies.reduce((count, enemy) => count + !enemy.dead, 0);
     this.text('room-progress', `${game.roomIndex + 1} / 9 방 · ${game.room.boss ? '최후의 결전' : game.room.cleared ? '전투 완료' : `${game.room.wave || 1} / ${game.room.totalWaves || 3} 차 공세 · 적 ${alive}`}`);
     this.text('run-time', timeLabel(game.time));
@@ -243,6 +250,10 @@ export class GameUI {
     this.fill('slow-fill', player.slow / player.maxSlow);
     this.text('dodge-text', player.rollTime > 0 ? '회피 중' : player.rollCooldown > 0 ? `회피 ${player.rollCooldown.toFixed(1)}초` : '회피 준비');
     this.node('dodge-status').className = player.rollCooldown > 0 ? 'dodge-wait' : 'dodge-ready';
+    this.text('crouch-status', player.crouching ? '웅크림' : '웅크리기');
+    this.text('vault-status', player.vaultTime > 0 ? '넘는 중' : player.vaultCooldown > 0 ? `담 넘기 ${player.vaultCooldown.toFixed(1)}초` : '담 넘기');
+    this.node('crouch-control').classList.toggle('active', Boolean(player.crouching));
+    this.node('vault-control').classList.toggle('active', player.vaultTime > 0);
     this.text('upgrade-count', Object.values(player.upgrades).reduce((sum, count) => sum + count, 0));
     this.text('weapon-name', def.name);
     this.text('weapon-tag', def.tag);
@@ -251,6 +262,21 @@ export class GameUI {
     this.fill('reload-fill', weapon.reload > 0 ? 1 - weapon.reload / weapon.reloadTotal : 0);
     this.text('reload-text', weapon.reload > 0 ? `재장전 ${weapon.reload.toFixed(1)}초` : weapon.ammo === 0 ? '탄창 소진 · 재장전' : '재장전');
     this.text('secondary-text', player.weapons.length > 1 ? WEAPONS[player.weapons[1 - player.weaponIndex].id].tag : '보조 무기 없음');
+    const durability = clamp(weapon.durability ?? 100, 0, 100), wetness = clamp(weapon.wetness ?? 0, 0, 100);
+    const clearing = clamp(Math.floor(weapon.clearProgress || 0), 0, 5), maintenance = clamp(weapon.maintenance || 0, 0, 1.4);
+    this.text('durability-number', `${Math.round(durability)}%`);
+    this.text('wetness-number', `${Math.round(wetness)}%`);
+    this.fill('durability-fill', durability / 100);
+    this.fill('wetness-fill', wetness / 100);
+    this.node('condition-panel').classList.toggle('jammed', Boolean(weapon.jammed));
+    this.node('condition-panel').classList.toggle('worn', durability <= 15);
+    this.node('condition-panel').classList.toggle('soaked', wetness >= 65);
+    this.node('condition-panel').classList.toggle('maintaining', maintenance > 0);
+    this.fill('service-fill', weapon.jammed ? clearing / 5 : maintenance / 1.4);
+    this.visible('service-track', Boolean(weapon.jammed || maintenance > 0));
+    this.text('condition-status', weapon.jammed ? `${weapon.jamReason === 'rain' ? '침수' : '마모'} 고장 · R 연타 ${clearing} / 5` : maintenance > 0 ? `정비 ${Math.min(100, Math.floor(maintenance / 1.4 * 100))}% · R 유지` : durability <= 15 ? '마모 위험 · R 1.4초 정비' : wetness >= 65 ? '총기가 젖습니다 · 지붕으로' : durability < 99 ? 'R 1.4초 유지 · 총기 정비' : '총기 상태 양호');
+    if (weapon.jammed) this.text('reload-text', '고장 · R 연타');
+    else if (maintenance > 0.25) this.text('reload-text', '현장 정비 중');
     this.visible('game-toast', game.toast.time > 0 && Boolean(game.toast.text));
     this.text('game-toast', game.toast.text || '');
     const pickup = game.pickups.find(item => Math.abs(item.x - player.x) < 90 && Math.abs(item.y - player.y) < 95);
@@ -259,7 +285,7 @@ export class GameUI {
     else if (pickup?.type === 'health') notice = `E · 체력 ${pickup.amount} 회복`;
     else if (game.room.cleared && game.room.rewardTaken) notice = Math.abs(player.x - game.room.exit.x) < 120 ? 'E · 다음 방으로' : '오른쪽 출구로 이동 →';
     else if (game.waveDelay > 0) notice = '다음 공세가 다가온다 · 재장전하세요';
-    else if (game.time < 9) notice = 'A D 이동 · Space 점프 · 좌클릭 사격';
+    else if (game.time < 9) notice = 'C 웅크리기 · F 담 넘기 · 우클릭 + 좌클릭 집중 사격';
     this.visible('room-notice', Boolean(notice));
     this.text('room-notice', notice);
   }

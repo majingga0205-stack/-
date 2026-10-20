@@ -28,7 +28,7 @@ with sync_playwright() as playwright:
     page.screenshot(path=str(OUT / 'title.png'))
     page.locator('.header-nav [data-action=controls]').click()
     expect(page.get_by_role('heading', name='살아남는 법')).to_be_visible()
-    assert page.locator('.control-row').count() == 10
+    assert page.locator('.control-row').count() == 14
     page.keyboard.press('Escape')
     page.locator('.header-nav [data-action=settings]').click()
     page.locator('#setting-music').fill('20')
@@ -86,6 +86,75 @@ with sync_playwright() as playwright:
     assert page.evaluate('__game.player.slow') < 99
     page.wait_for_timeout(700)
 
+    # Exercise actual DOM mouse events: pointerdown alone misses the second
+    # button in a chord, so direct state changes cannot catch this regression.
+    page.evaluate('''() => {
+      const g=__game; g.enemies=[]; g.bullets=[]; g.room.covers=[]; g.room.platforms=[];
+      g.room.wave=1; g.waveDelay=999; g.player.invuln=100; g.player.slow=100;
+      Object.assign(g.getWeapon(),{ammo:12,reload:0,cooldown:0,jammed:false,durability:100,wetness:0});
+    }''')
+    aim(1000, 450)
+    for first, second in [('right', 'left'), ('left', 'right')]:
+        page.evaluate('__game.player.slow=100; __game.getWeapon().cooldown=0')
+        shots = page.evaluate('__game.stats.shots')
+        page.mouse.down(button=first)
+        page.wait_for_timeout(70)
+        page.mouse.down(button=second)
+        page.wait_for_timeout(750)
+        assert page.evaluate('__game.input.mouse.left && __game.input.mouse.right && __game.slowActive'), (first, second)
+        assert page.evaluate('__game.stats.shots') > shots, 'Both button orders must fire during slow motion'
+        page.mouse.up(button=second)
+        page.wait_for_timeout(40)
+        assert page.evaluate(f'__game.input.mouse.{first}'), 'Releasing one button must preserve the other'
+        assert not page.evaluate(f'__game.input.mouse.{second}'), 'Each button releases independently'
+        page.mouse.up(button=first)
+        page.wait_for_timeout(40)
+        assert not page.evaluate('__game.input.mouse.left || __game.input.mouse.right')
+
+    # C changes the collision body, not only the drawing; F crosses a real crate.
+    page.evaluate('''() => {
+      const g=__game; Object.assign(g.player,{x:250,y:640,vx:0,vy:0,grounded:true,rollTime:0});
+      g.room.covers=[];g.room.platforms=[];g.camera.x=0;
+    }''')
+    page.keyboard.down('c')
+    page.wait_for_timeout(80)
+    assert page.evaluate('__game.player.h') == 34
+    page.keyboard.up('c')
+    page.wait_for_timeout(80)
+    assert page.evaluate('__game.player.h') == 58
+    page.evaluate('''() => {
+      __game.room.covers=[{x:285,y:588,w:60,h:52,hp:100,maxHp:100,destructible:false}];
+      __game.player.vaultCooldown=0;
+    }''')
+    aim(1000, 450)
+    page.keyboard.press('f')
+    page.wait_for_timeout(900)
+    assert page.evaluate('__game.player.x') > 360, 'F must cross the near crate'
+
+    # A held R and auto-repeat keydowns are not distinct jam-clearing taps.
+    page.evaluate('''() => {
+      const g=__game;g.room.covers=[];
+      Object.assign(g.getWeapon(),{jammed:true,clearProgress:0,ammo:12,reload:0,cooldown:0,wetness:100,durability:0});
+    }''')
+    page.keyboard.down('r')
+    for _ in range(6):
+        page.keyboard.down('r')
+        page.wait_for_timeout(35)
+    assert page.evaluate('__game.getWeapon().jammed'), 'OS key repeat must not clear a jam'
+    assert page.evaluate('__game.getWeapon().clearProgress') == 1
+    page.keyboard.up('r')
+    for _ in range(4):
+        page.keyboard.press('r')
+        page.wait_for_timeout(65)
+    assert not page.evaluate('__game.getWeapon().jammed')
+    assert page.evaluate('__game.getWeapon().durability') >= 35
+    assert page.evaluate('__game.getWeapon().wetness') <= 30
+    page.keyboard.down('r')
+    page.wait_for_timeout(1700)
+    page.keyboard.up('r')
+    assert page.evaluate('__game.getWeapon().durability') == 100
+    print('PASS: real two-button slow/fire chords in both orders, independent release, crouch, vault, distinct R jam taps, maintenance')
+
     # Fixed combat fixture, but damage is delivered with real aiming + mouse fire.
     page.evaluate('''() => {
       const g=__game; g.player.x=250; g.player.y=640; g.player.vx=0; g.player.vy=0;
@@ -132,9 +201,27 @@ with sync_playwright() as playwright:
         assert page.evaluate('__game.roomIndex') == room_index + 1
     print('PASS: 8 rooms × 3 waves, 3 zones, rewards, paused reward clock, E exits (accelerated encounter fixtures)')
 
+    # The final encounter is visible from the entrance: the car drifts in before
+    # the boss gets an active collision/attack body and guards enter through doors.
+    page.wait_for_timeout(1350)
+    assert page.evaluate('__game.bossIntro.kind') == 'bossCar'
+    assert page.evaluate('__game.bossIntro.drift') > 0
+    assert page.evaluate('__game.enemies.find(e=>e.type==="boss").spawnTime') > 0
+    page.screenshot(path=str(OUT / 'boss-arrival.png'))
+    page.keyboard.press('Escape')
+    intro_state = page.evaluate('JSON.stringify([__game.arrivals,__game.weather,__game.getWeapon(),__game.player.vaultCooldown])')
+    page.wait_for_timeout(250)
+    assert page.evaluate('JSON.stringify([__game.arrivals,__game.weather,__game.getWeapon(),__game.player.vaultCooldown])') == intro_state
+    page.get_by_role('button', name='계속하기').click()
+    page.wait_for_timeout(1050)
+    assert page.evaluate('__game.bossIntro.doorOpen')
+    assert page.evaluate('__game.enemies.find(e=>e.type==="boss").entry.visible')
+    page.screenshot(path=str(OUT / 'boss-unload.png'))
+    print('PASS: visible boss car drift, door opening, boss disembark, paused encounter/weather/condition timers')
+
     page.evaluate('''() => {
       const g=__game,b=g.enemies.find(e=>e.type==='boss');
-      g.player.x=1600;g.player.y=640;g.player.invuln=100;g.camera.x=1300;
+      g.player.x=430;g.player.y=640;g.player.invuln=100;g.camera.x=0;
       b.spawnTime=0;b.hp=b.maxHp*0.49;g.updateEnemy(b,0.01);
     }''')
     assert page.evaluate('__game.enemies.find(e=>e.type==="boss").phase') == 2

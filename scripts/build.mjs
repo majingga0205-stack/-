@@ -8,7 +8,9 @@ const root = new URL('../', import.meta.url);
 const modules = [
   ['data.js', ['WEAPONS', 'UPGRADES', 'ZONES', 'ENEMY_TYPES', 'generateRoom']],
   ['audio.js', ['AudioEngine']],
+  ['scenery.js', ['drawScene', 'drawWeather', 'drawArrivals']],
   ['render.js', ['Renderer']],
+  ['encounters.js', ['createEncounter', 'updateEncounters']],
   ['game.js', ['WIDTH', 'HEIGHT', 'GROUND', 'STEP', 'seededRandom', 'segmentRect', 'Game']],
   ['ui.js', ['GameUI']],
   ['main.js', []],

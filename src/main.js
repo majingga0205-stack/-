@@ -17,6 +17,7 @@ function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
   game.tick(dt);
+  audio.setWeather?.(game.mode === 'playing' ? game.weather.intensity : game.mode === 'title' ? 0.15 : 0);
   audio.update(dt, game.mode);
   renderer.draw(game, dt);
   ui.update();
