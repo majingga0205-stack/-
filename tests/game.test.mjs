@@ -9,13 +9,13 @@ test('game still starts when browser policy denies localStorage access', () => {
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('Storage denied'); } });
   try {
     const g = new Game(); g.startRun(123); g.setSettings({ sfx: 0 });
-    assert.equal(g.mode, 'playing'); assert.equal(g.storage, null); assert.equal(g.player.hp, 100);
+    assert.equal(g.mode, 'playing'); assert.equal(g.storage, null); assert.equal(g.player.hp, 50);
   } finally {
     if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
     else delete globalThis.localStorage;
   }
 });
-function fresh(seed = 123) { const g = new Game({ storage: memory() }); g.startRun(seed); g.room.covers = []; g.room.platforms = []; g.updateRoomProgress = () => {}; g.enemies = []; return g; }
+function fresh(seed = 123) { const g = new Game({ storage: memory() }); g.startRun(seed); g.room.covers = []; g.room.platforms = []; g.room.hazards = []; g.arrivals = []; g.updateRoomProgress = () => {}; g.enemies = []; return g; }
 function advance(g, seconds, fps = 60) { for (let i = 0; i < seconds * fps; i++) g.tick(1 / fps); }
 
 test('movement and fire are independent of rendering at 30/60/144 FPS', () => {
@@ -33,7 +33,7 @@ test('jump buffer and coyote allow forgiving grounded transitions', () => {
   const c = fresh(); c.player.y = 635; c.player.grounded = false; c.player.coyote = 0.08; c.input.pressed.add('Space'); c.tick(1 / 60); assert.ok(c.player.vy < 0, 'coyote jump');
 });
 test('roll has short invulnerability and enforced cooldown', () => {
-  const g = fresh(); g.player.invuln = 0; assert.equal(g.roll(), true); assert.equal(g.damagePlayer(20), false); assert.equal(g.roll(), false); advance(g, 0.4); assert.equal(g.damagePlayer(20), true); assert.equal(g.player.hp, 80); advance(g, 1); assert.equal(g.roll(), true);
+  const g = fresh(); g.player.invuln = 0; assert.equal(g.roll(), true); assert.equal(g.damagePlayer(20), false); assert.equal(g.roll(), false); advance(g, 0.4); assert.equal(g.damagePlayer(20), true); assert.equal(g.player.hp, 30); advance(g, 1); assert.equal(g.roll(), true);
 });
 test('magazine, reload, swap and pause timers behave coherently', () => {
   const g = fresh(); g.fire(); assert.equal(g.getWeapon().ammo, 11); assert.equal(g.reload(), true); const time = g.getWeapon().reload;
@@ -45,7 +45,7 @@ test('slow motion is finite and stops completely during pause', () => {
 });
 test('swept collision prevents fast bullets tunneling through thin cover', () => {
   assert.equal(segmentRect(0, 20, 100, 20, { x: 50, y: 0, w: 2, h: 50 }), 0.5);
-  const g = fresh(); g.room.covers = [{ x: 200, y: 550, w: 4, h: 90, hp: 100, maxHp: 100, destructible: true }]; g.player.aim = 0; g.fire(); g.updateBullets(0.1); assert.equal(g.bullets.length, 0); assert.equal(g.room.covers[0].hp, 78);
+  const g = fresh(); g.room.covers = [{ x: 200, y: 550, w: 4, h: 90, hp: 100, maxHp: 100, destructible: true }]; g.player.aim = 0; g.fire(); g.updateBullets(0.1); assert.equal(g.bullets.length, 0); assert.equal(g.room.covers[0].hp, 100 - WEAPONS.pistol.damage);
 });
 test('all four weapons have distinct magazine/rate/reload/spread and shotgun pellets', () => {
   assert.equal(Object.keys(WEAPONS).length, 4); assert.equal(new Set(Object.values(WEAPONS).map(w => w.interval)).size, 4); const g = fresh(); g.player.weapons = [g.createWeapon('shotgun')]; g.fire(); assert.equal(g.bullets.length, 7);

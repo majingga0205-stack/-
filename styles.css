@@ -47,7 +47,7 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
 .hud-bottom{gap:18px}.ability-panel,.weapon-panel{background:none}
 .location-line{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:7px;font-size:10px;letter-spacing:.25px;color:#d0c9b1}
 #weather-status{border-left:1px solid #54616e;padding-left:9px;color:#8fa9bd;font-size:9px;white-space:nowrap}
-#weather-status.sheltered{color:#a0bb9b}
+#weather-status.raining{color:#a6bacd}
 .area-panel>#room-progress{margin-top:5px;color:#909eac;font-size:9px;letter-spacing:.4px}
 .movement-controls{display:flex;gap:16px;margin-top:5px;color:#8e9aab;font-size:9px;white-space:nowrap}
 .movement-controls kbd{font-size:8px;padding:1px 4px;color:#bdc8ce;background:#111b27;border-color:#4b5867}
@@ -69,3 +69,7 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
 @media(max-width:1100px){.location-line{font-size:9px;margin-top:5px;gap:6px}#weather-status{font-size:8px;padding-left:6px}.area-panel>#room-progress{font-size:8px}.condition-panel{width:220px;padding:5px 7px}.condition-meters{gap:10px}.condition-label{font-size:8px}.condition-label strong{font-size:9px}.condition-status,.movement-controls{font-size:8px}.movement-controls{gap:10px}.room-notice{font-size:9px}}
 @media(max-width:800px){.hud-bottom{gap:9px}.condition-panel{max-width:29%;padding:4px 6px}.condition-meters{gap:8px}.condition-label{font-size:7px}.condition-label strong{font-size:8px}.condition-status{font-size:7px;white-space:normal;line-height:1.45;margin-top:4px}.movement-controls{font-size:7px;gap:7px;margin-top:4px}.movement-controls kbd{font-size:6px;padding:1px 3px}.location-line{flex-direction:column;gap:4px;font-size:8px;margin-top:5px}#weather-status{border-left:0;padding-left:0;font-size:7px}.area-panel>#room-progress{font-size:7px}.room-notice{bottom:14%;font-size:8px;max-width:58%}.story-caption{top:26%}.quick-keys{gap:7px;font-size:7px}}
 @media(max-width:560px){.condition-meters{gap:5px}.condition-label{font-size:6px;gap:3px}.condition-label strong{font-size:7px}.condition-status{font-size:6px}.movement-controls{font-size:6px;gap:4px}.movement-controls kbd{font-size:5px;padding:1px 2px}.condition-panel{padding:4px}.area-panel{width:43%}.location-line{font-size:7px}.room-notice{font-size:7px}.control-keys kbd{font-size:6px}}
+
+/* Hazard and inspection hints share the existing compact HUD. */
+.movement-controls .blocked{color:#cf8d74}.movement-controls .blocked kbd{border-color:#8f5a48;color:#d8a38a}
+.control-tip p{margin:0 0 12px}.control-tip p:last-child{margin-bottom:0}

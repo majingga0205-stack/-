@@ -1,4 +1,5 @@
 import { drawScene, drawWeather, drawArrivals } from './scenery.js';
+import { PLAYER_HEADS, getPlayerPose } from './motion.js';
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -99,7 +100,86 @@ function pixelPolygon(ctx, points, color) {
   }
 }
 
+// The detective uses jointed poses instead of a wide chest plate or a rotated
+// standing sprite. Every limb and coat hem is rasterized on the same 64px grid.
+function makePlayer(pose, frame) {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d'), p = ACTOR_COLORS.player;
+  const step = [0, 5, 0, -5][frame % 4];
+  let body = { head:[33,13], angle:0, neck:[32,23], hip:[31,42], knees:[[27+step,51],[35-step,51]], feet:[[24+step,61],[38-step,61]], arm:[[25,27],[22-step*.35,37],[24-step*.5,44]], hem:12 };
+  const poses = {
+    crouch: { head:[38,36],neck:[35,44],hip:[29,51],knees:[[20,55],[42,54]],feet:[[23,62],[43,62]],arm:[[30,45],[25,50],[22,54]],hem:5 },
+    jumpRise: { head:[36,12],angle:.08,neck:[34,23],hip:[30,39],knees:[[20,43],[42,43]],feet:[[17,54],[35,53]],arm:[[27,26],[22,34],[18,38]],hem:12 },
+    jumpFall: { head:[32,13],angle:-.05,neck:[31,23],hip:[30,40],knees:[[24,49],[39,48]],feet:[[23,59],[42,58]],arm:[[25,27],[19,33],[17,39]],hem:13 },
+    land: { head:[36,20],angle:.08,neck:[33,30],hip:[29,44],knees:[[19,53],[43,51]],feet:[[23,62],[45,62]],arm:[[27,32],[23,42],[27,48]],hem:9 },
+    vaultPlant: { head:[40,15],angle:.25,neck:[36,26],hip:[28,41],knees:[[19,48],[42,39]],feet:[[18,61],[48,46]],arm:[[30,28],[36,36],[46,39]],hem:10 },
+    vaultTuck: { head:[43,22],angle:.45,neck:[36,30],hip:[25,41],knees:[[35,41],[44,34]],feet:[[45,46],[56,37]],arm:[[30,31],[23,39],[27,48]],hem:11 },
+    vaultClear: { head:[37,14],angle:.1,neck:[34,25],hip:[30,40],knees:[[40,47],[25,49]],feet:[[51,55],[24,61]],arm:[[28,28],[21,36],[18,42]],hem:11 },
+    barrierPlant: { head:[40,18],angle:.35,neck:[35,29],hip:[24,41],knees:[[35,43],[18,49]],feet:[[48,48],[12,58]],arm:[[30,30],[38,38],[45,43]],hem:9 },
+    barrierClear: { head:[37,26],angle:.65,neck:[30,35],hip:[20,44],knees:[[38,43],[39,36]],feet:[[55,43],[56,34]],arm:[[25,35],[21,43],[27,51]],hem:10 },
+    barrierLand: { head:[38,19],angle:.12,neck:[34,30],hip:[29,44],knees:[[20,53],[41,50]],feet:[[23,62],[48,60]],arm:[[28,32],[24,43],[28,48]],hem:8 },
+    dash: { head:[44,20],angle:.4,neck:[37,30],hip:[24,42],knees:[[14,47],[34,45]],feet:[[9,57],[22,55]],arm:[[30,32],[22,36],[14,36]],hem:11 },
+  };
+  if (poses[pose]) body = {...body, ...poses[pose]};
+  if (pose === 'roll') {
+    const rolls = [
+      {head:[41,32],angle:.7,neck:[35,41],hip:[24,45],knees:[[18,54],[40,50]],feet:[[21,62],[47,59]],arm:[[30,40],[41,46],[46,52]],hem:9},
+      {head:[43,47],angle:1.7,neck:[35,43],hip:[23,35],knees:[[19,27],[32,27]],feet:[[29,24],[43,33]],arm:[[33,43],[39,54],[32,58]],hem:9},
+      {head:[23,49],angle:-1.8,neck:[28,42],hip:[41,38],knees:[[48,46],[40,53]],feet:[[51,57],[31,60]],arm:[[28,43],[19,53],[27,58]],hem:8},
+      {head:[31,29],angle:-.2,neck:[32,39],hip:[33,48],knees:[[21,55],[42,54]],feet:[[22,62],[47,62]],arm:[[28,41],[22,49],[24,55]],hem:7},
+    ];
+    body = {...body, ...rolls[frame % 4]};
+  }
+  body.head = pose === 'roll' ? PLAYER_HEADS.roll[frame % 4] : PLAYER_HEADS[pose] || PLAYER_HEADS.stand;
+  const poly = (points,color) => pixelPolygon(ctx,points,color);
+  const limb = (a,b,width,color) => {
+    const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1,nx=-dy/len*width/2,ny=dx/len*width/2;
+    poly([[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]],color);
+  };
+  const chain = (points,width,color) => { for(let i=1;i<points.length;i++){limb(points[i-1],points[i],width+2,p.ink);limb(points[i-1],points[i],width,color);} };
+  // The planted arm is drawn in world space so its hand can hold the actual
+  // obstacle lip. Keeping it here as well would produce a third arm.
+  if (!pose.endsWith('Plant')) chain(body.arm,4,p.dark);
+  for (let side=0;side<2;side++) {
+    const hip=[body.hip[0]+(side?3:-3),body.hip[1]];
+    chain([hip,body.knees[side],body.feet[side]],side?5:4,side?p.coat:p.dark);
+    pixelLine(ctx,body.knees[side][0],body.knees[side][1],body.feet[side][0],body.feet[side][1]-3,side?p.fold:p.dark);
+    const foot=body.feet[side];ctx.fillStyle=p.ink;ctx.fillRect(Math.round(foot[0]-3),Math.round(foot[1]-1),10,4);
+    ctx.fillStyle=side?p.edge:p.fold;ctx.fillRect(Math.round(foot[0]),Math.round(foot[1]-1),6,1);
+  }
+  const n=body.neck,h=body.hip,dx=h[0]-n[0],dy=h[1]-n[1],len=Math.hypot(dx,dy)||1;
+  const side=[dy/len,-dx/len],down=[dx/len,dy/len];
+  const point=(base,across,along=0)=>[base[0]+side[0]*across+down[0]*along,base[1]+side[1]*across+down[1]*along];
+  const hem=[h[0]+down[0]*body.hem,h[1]+down[1]*body.hem];
+  poly([point(n,-7),point(n,5),point(h,7),point(hem,7),point(hem,2,-3),point(h,0,2),point(hem,-5),point(hem,-9),point(h,-6)],p.ink);
+  poly([point(n,-5,-1),point(n,4),point(h,5),point(hem,5,-2),point(hem,1,-4),point(h,-1,1),point(hem,-5,-2),point(hem,-7,-2),point(h,-4)],p.coat);
+  poly([point(n,-4,2),point(h,-2),point(hem,-5,-3),point(hem,-7,-3)],p.dark);
+  poly([point(n,2,3),point(h,3),point(hem,4,-3),point(h,5,-2)],p.fold);
+  const lapel=point(n,-2,3),lapelEnd=point(n,-3,10);
+  pixelLine(ctx,...point(n,-5),...lapel,p.edge);pixelLine(ctx,...lapel,...lapelEnd,p.fold);
+  pixelLine(ctx,...point(n,1,2),...point(n,1,11),p.accent);
+  pixelLine(ctx,...point(h,4,-2),...point(hem,5,-3),p.edge);
+  ctx.fillStyle=p.metal;const button=point(h,0,-4);ctx.fillRect(Math.round(button[0]),Math.round(button[1]),1,1);
+  // Face and fedora are redrawn at each joint angle, not rotated as a bitmap.
+  const angle=body.angle||0,head=body.head,cos=Math.cos(angle),sin=Math.sin(angle);
+  const hp=(x,y)=>[head[0]+x*cos-y*sin,head[1]+x*sin+y*cos];
+  const face=(pts,color)=>poly(pts.map(([x,y])=>hp(x,y)),color);
+  face([[-4,-4],[4,-4],[5,0],[8,2],[5,3],[4,8],[-3,7],[-6,2]],p.ink);
+  face([[0,-2],[4,-2],[4,1],[7,2],[4,3],[3,6],[-1,6],[-1,1]],p.skin);
+  pixelLine(ctx,...hp(1,0),...hp(5,0),p.dark);pixelLine(ctx,...hp(5,3),...hp(6,3),p.light);
+  face([[-8,-10],[3,-10],[7,-6],[6,-2],[13,0],[13,2],[-12,2],[-12,0],[-7,-2]],p.ink);
+  face([[-6,-8],[2,-8],[5,-5],[5,-2],[-7,-2]],p.coat);
+  pixelLine(ctx,...hp(-6,-7),...hp(2,-7),p.fold);pixelLine(ctx,...hp(-6,-3),...hp(5,-3),p.dark);
+  pixelLine(ctx,...hp(-10,0),...hp(10,0),p.fold);pixelLine(ctx,...hp(-9,0),...hp(-2,0),p.edge);
+  if (pose==='roll' || pose.startsWith('vault') || pose.startsWith('barrier')) {
+    const front = pose==='roll' ? [point(n,4,3),[body.head[0]+2,body.head[1]+6],point(n,0,8)] : [point(n,3,4),point(h,6,-2),point(h,8,5)];
+    chain(front,4,p.coat);const hand=front[2];ctx.fillStyle=p.skin;ctx.fillRect(Math.round(hand[0]-1),Math.round(hand[1]-1),3,3);
+  }
+  return canvas;
+}
+
 function makeActor(type, pose = 'stand', frame = 0) {
+  if (type === 'player') return makePlayer(pose, frame);
   const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
   const ctx = canvas.getContext('2d');
   const p = ACTOR_COLORS[type] || ACTOR_COLORS.pistol;
@@ -277,7 +357,7 @@ export class Renderer {
     }));
     this.actors = new Map();
     this.guns = new Map();
-    for (const type of Object.keys(ACTOR_COLORS)) for (const pose of ['stand', 'crouch', 'vault']) {
+    for (const type of Object.keys(ACTOR_COLORS)) for (const pose of (type === 'player' ? ['stand','crouch','jumpRise','jumpFall','land','roll','vaultPlant','vaultTuck','vaultClear','barrierPlant','barrierClear','barrierLand'] : ['stand','crouch','vault'])) {
       for (let frame = 0; frame < 4; frame++) this.actors.set(`${type}/${pose}/${frame}`, makeActor(type, pose, frame));
     }
     for (const id of ['pistol', 'revolver', 'smg', 'shotgun', 'heavy', 'boss']) this.guns.set(id, makeGun(id));
@@ -305,12 +385,14 @@ export class Renderer {
     const camera = Math.round((game.camera?.x || 0) / DOT) * DOT;
     drawScene(ctx, game, camera, this.time);
     ctx.save(); ctx.translate(-camera, 0);
-    drawArrivals(ctx, game, camera, this.time);
+    drawArrivals(ctx, game, camera, this.time, 'back');
     this.drawExit(game);
     for (const platform of game.room.platforms || []) this.drawPlatform(platform);
     for (const cover of game.room.covers || []) {
       if (cover.hp > 0 || !cover.destructible) this.drawCover(cover, game.room.theme);
     }
+    for (const hazard of game.room.hazards || []) this.drawHazard(hazard);
+    drawArrivals(ctx, game, camera, this.time, 'front');
     for (const pickup of game.pickups || []) this.drawPickup(pickup, game.player);
     for (const enemy of game.enemies || []) {
       if (!enemy.dead && enemy.hp > 0) this.drawEnemy(enemy, game);
@@ -493,6 +575,32 @@ export class Renderer {
 
   drawCover(c, theme) {
     const ctx = this.ctx;
+    if (c.kind === 'barricade') {
+      ctx.save(); ctx.translate(Math.round(c.x), Math.round(c.y));
+      ctx.fillStyle='#070d13';ctx.fillRect(-2,0,c.w+4,c.h);
+      ctx.fillStyle='#495354';ctx.fillRect(1,2,c.w-2,c.h-2);
+      ctx.fillStyle='#81908a';ctx.fillRect(-3,0,c.w+6,3);
+      ctx.fillStyle='#1a272f';ctx.fillRect(4,6,c.w-8,c.h-10);
+      for(let y=10;y<c.h-8;y+=15) {
+        pixelPolygon(ctx,[[3,y],[c.w-3,y+9],[c.w-3,y+14],[3,y+5]],'#b59d64');
+        ctx.fillStyle='#d1be8d';ctx.fillRect(3,y,3,2);
+      }
+      ctx.fillStyle='#333f43';ctx.fillRect(-9,c.h-4,c.w+18,4);
+      ctx.fillStyle='#b1bcb0';ctx.fillRect(3,4,2,2);ctx.fillRect(c.w-5,4,2,2);
+      ctx.restore();return;
+    }
+    if (c.kind === 'wire') {
+      ctx.save();ctx.translate(Math.round(c.x),Math.round(c.y));
+      ctx.fillStyle='#1b282e';ctx.fillRect(0,0,c.w,c.h);
+      for(let i=-c.h;i<c.w;i+=12) {
+        const start=Math.max(0,-i),end=Math.min(c.h,c.w-i);
+        pixelLine(ctx,i+start,start,i+end,end,'#536465');
+        pixelLine(ctx,c.w-i-start,start,c.w-i-end,end,'#354b53');
+      }
+      ctx.fillStyle='#81918a';ctx.fillRect(0,0,3,c.h);ctx.fillRect(c.w-3,0,3,c.h);ctx.fillRect(0,1,c.w,2);
+      ctx.fillStyle='#554039';ctx.fillRect(4,4,9,9);ctx.fillStyle='#b39364';ctx.fillRect(7,5,2,5);ctx.fillRect(7,11,2,1);
+      ctx.restore();label(ctx,'철조망 · 넘기 불가',c.x+c.w/2,c.y-16,10,'#bf9b7d');return;
+    }
     const destructible = c.destructible;
     ctx.save(); ctx.translate(c.x, c.y);
     ctx.fillStyle = '#0006'; ctx.fillRect(5, c.h - 3, c.w + 7, 7);
@@ -519,6 +627,19 @@ export class Renderer {
       line(ctx, 0, 1, c.w, 1, '#a0aaa4', 3);
       for (let y = 13; y < c.h - 6; y += 14) line(ctx, 10, y, c.w - 10, y, '#23333c', 3);
       ctx.fillStyle = '#b9aa71'; ctx.fillRect(c.w - 14, 8, 5, 4);
+    }
+    ctx.restore();
+  }
+
+  drawHazard(h) {
+    if(h.kind!=='wire') return;
+    const ctx=this.ctx, y=Math.round(h.y+h.h*.6);
+    ctx.save();
+    pixelLine(ctx,h.x,y,h.x+h.w,y,'#89948b',2);
+    pixelLine(ctx,h.x,y+3,h.x+h.w,y+3,'#34474e');
+    for(let x=h.x+5;x<h.x+h.w-4;x+=11) {
+      pixelLine(ctx,x-3,y-4,x+4,y+4,'#a3ada2');pixelLine(ctx,x-3,y+4,x+4,y-4,'#657a7b');
+      ctx.fillStyle='#4c302b';ctx.fillRect(Math.round(x),y-1,2,2);
     }
     ctx.restore();
   }
@@ -582,34 +703,41 @@ export class Renderer {
   drawPlayer(p, game) {
     const ctx = this.ctx;
     const x = Math.round(p.x), y = Math.round(p.y);
-    const dir = Math.cos(p.aim || 0) >= 0 ? 1 : -1;
-    const moving = Math.abs(p.vx || 0) > 15 && p.grounded;
-    const frame = moving ? Math.floor((p.animation || this.time * 16) / 1.7) % 4 : 0;
-    const pose = p.vaultTime > 0 ? 'vault' : p.crouching || p.rollTime > 0 ? 'crouch' : 'stand';
+    const aimDir = Math.cos(p.aim || 0) >= 0 ? 1 : -1;
+    const { pose, frame, dir, vaultProgress } = getPlayerPose(p);
+    const vaulting = p.vaultTime > 0 && p.vault;
     ctx.save(); ctx.translate(x, y);
     if (p.invuln > 0) ctx.globalAlpha = game.settings?.flash === 0 ? 0.72 : 0.64 + Math.sin(this.time * 48) * 0.15 * (game.settings?.flash ?? 0.5);
-    ctx.fillStyle = '#02040999'; ctx.fillRect(-20, -3, 40, 5); ctx.fillRect(-15, 2, 30, 2);
-    if (p.rollTime > 0) {
-      ctx.translate(0, -19); ctx.rotate(Math.round(p.rollTime * 17 / (Math.PI / 4)) * Math.PI / 4 * (p.rollDir || dir)); ctx.translate(0, 19);
+    ctx.fillStyle = '#02040999'; ctx.fillRect(-17, -2, 34, 4);
+    ctx.save(); ctx.scale(dir, 1); ctx.drawImage(this.actor('player', pose, frame), -32, -64); ctx.restore();
+    const weapon = p.weapons?.[p.weaponIndex], id = weapon?.id || 'pistol';
+    if (vaulting && vaultProgress >= .24 && vaultProgress < .33 && Number.isFinite(p.vault.obstacleX)) {
+      // The support hand stays on the same physical lip while knees lift.
+      const lipX = dir > 0 ? p.vault.obstacleX + 3 : p.vault.obstacleX + p.vault.obstacleW - 3;
+      const lipY = p.vault.obstacleY + 1;
+      const sx = dir * 5, sy = -36, hx = lipX - x, hy = lipY - y;
+      const ex = sx + (hx-sx)*.55 - dir*3, ey = sy + (hy-sy)*.46 + 5;
+      pixelLine(ctx,sx-1,sy-1,ex,ey,'#060b11',6);pixelLine(ctx,ex,ey,hx-2,hy-2,'#060b11',6);
+      pixelLine(ctx,sx,sy,ex,ey,'#263440',4);pixelLine(ctx,ex,ey,hx-1,hy-1,'#33414b',4);
+      ctx.fillStyle='#ac9981';ctx.fillRect(Math.round(hx-3),Math.round(hy-1),6,2);
     }
-    ctx.save(); ctx.scale(dir, 1);
-    ctx.drawImage(this.actor('player', pose, frame), -32, -64);
+    if (!vaulting && p.rollTime <= 0) {
+      const recoil = Math.min((p.recoil || 0) / ({ pistol: 3, revolver: 7, smg: 2.3, shotgun: 9 }[id] || 3), 1);
+      const origin = p.crouching ? 21 : pose==='land' ? 34 : 38;
+      ctx.save(); ctx.translate(0, -origin); ctx.rotate(p.aim || 0);
+      if (aimDir < 0) ctx.scale(1, -1);
+      const hand = 13 - Math.round(recoil * 4);
+      ctx.fillStyle = '#090f16'; ctx.fillRect(-3, 0, hand + 5, 6);
+      ctx.fillStyle = '#263440'; ctx.fillRect(-2, 1, hand, 4);
+      ctx.fillStyle = '#53616b'; ctx.fillRect(0, 1, hand - 1, 1);
+      ctx.fillStyle = '#6b655e'; ctx.fillRect(hand, 1, 5, 3);
+      ctx.fillStyle = '#aba08b'; ctx.fillRect(hand + 3, 1, 2, 1);
+      ctx.translate(hand + 3, 0); this.drawGun(ctx, id, 1, p.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);ctx.restore();
+    } else {
+      // Weapon stays close to the body while both hands/shoulders do the work.
+      ctx.save();ctx.translate(dir*1,-25);ctx.scale(dir,1);ctx.rotate(.9);this.drawGun(ctx,id,.58);ctx.restore();
+    }
     ctx.restore();
-    const weapon = p.weapons?.[p.weaponIndex];
-    const id = weapon?.id || 'pistol';
-    const recoil = Math.min((p.recoil || 0) / ({ pistol: 3, revolver: 7, smg: 2.3, shotgun: 9 }[id] || 3), 1);
-    const origin = p.crouching ? 21 : p.vaultTime > 0 ? 32 : 38;
-    ctx.save(); ctx.translate(0, -origin); ctx.rotate(p.aim || 0);
-    if (dir < 0) ctx.scale(1, -1);
-    const hand = 13 - Math.round(recoil * 4);
-    ctx.fillStyle = '#090f16'; ctx.fillRect(-3, 0, hand + 5, 7);
-    ctx.fillStyle = '#263644'; ctx.fillRect(-2, 1, hand, 5);
-    ctx.fillStyle = '#53616b'; ctx.fillRect(0, 1, hand - 1, 1);
-    ctx.fillStyle = '#6b655e'; ctx.fillRect(hand, 1, 5, 4);
-    ctx.fillStyle = '#aba08b'; ctx.fillRect(hand + 3, 1, 2, 1);
-    ctx.translate(hand + 3, 0);
-    this.drawGun(ctx, id, 1, p.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);
-    ctx.restore(); ctx.restore();
     if (p.upgrades?.dodgeShot && p.dodgeBuff > 0) glow(ctx, x, y - 36, 19, '#ecc36b25');
     if (weapon?.jammed) label(ctx, '총기 고장 · R 연타', x, y - (p.crouching ? 48 : 75), 12, '#e5a16f');
     else if (p.crouching) {
@@ -625,7 +753,19 @@ export class Renderer {
     const progress = Math.max(0, Math.min(1, 1 - e.timer / (e.windupTotal || 1)));
     ctx.save();
     ctx.globalAlpha = 0.38 + progress * 0.4;
-    if (rusher || (boss && e.pattern === 'rush')) {
+    if (rusher && e.pattern === 'leap') {
+      const direction = e.chargeDir || (Math.cos(aim) >= 0 ? 1 : -1);
+      const length = 265, height = 122;
+      // A broken arc distinguishes a jumping lunge from a ground charge.
+      for (let i = 0; i < 18; i += 2) {
+        const a = i / 18, b = (i + 1) / 18;
+        pixelLine(ctx, e.x + direction * length * a, e.y - 10 - 4 * height * a * (1-a), e.x + direction * length * b, e.y - 10 - 4 * height * b * (1-b), '#f1aa73', 2);
+      }
+      const tip = e.x + direction * length;
+      pixelLine(ctx, tip - direction * 14, e.y - 26, tip, e.y - 10, '#f1aa73', 2);
+      pixelLine(ctx, tip, e.y - 10, tip - direction * 18, e.y - 10, '#f1aa73', 2);
+      label(ctx, '도약 준비', e.x, e.y - (e.h || 58) - 24, 10, '#efb687');
+    } else if (rusher || (boss && e.pattern === 'rush')) {
       const direction = boss ? (e.chargeDir || (Math.cos(aim) >= 0 ? 1 : -1)) : (Math.cos(aim) >= 0 ? 1 : -1);
       const length = boss ? 380 : 260;
       ctx.setLineDash([10, 9]);
@@ -682,7 +822,10 @@ export class Renderer {
     const moving = entering || Math.abs(e.vx || 0) > 5;
     const frame = moving ? Math.floor(this.time * 9 + (entering ? (e.entry.progress || 0) * 5 : e.x * .02)) % 4 : 0;
     ctx.fillStyle = '#02040999'; ctx.fillRect(-20, -3, 40, 5);
-    ctx.save(); ctx.scale(dir, 1); ctx.drawImage(this.actor(e.type, 'stand', frame), -32, -64); ctx.restore();
+    ctx.save(); ctx.scale(dir, 1);
+    const enemyPose = rusher && (!e.grounded || e.airDashTime > 0) ? 'vault' : 'stand';
+    if(rusher && e.airDashTime > 0) { ctx.save();ctx.globalAlpha=.18;ctx.drawImage(this.actor(e.type,enemyPose,frame),-48,-64);ctx.restore(); }
+    ctx.drawImage(this.actor(e.type, enemyPose, frame), -32, -64); ctx.restore();
     ctx.save(); ctx.translate(0, -37); ctx.rotate(aim); if (dir < 0) ctx.scale(1, -1);
     const palette = ACTOR_COLORS[e.type];
     ctx.fillStyle = palette.ink; ctx.fillRect(0, 0, 16, heavy ? 9 : 7);

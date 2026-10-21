@@ -1,5 +1,6 @@
 import { WEAPONS, UPGRADES, ZONES, ENEMY_TYPES, generateRoom } from './data.js';
 import { createEncounter, updateEncounters } from './encounters.js';
+import { PLAYER_HEADS, getPlayerPose } from './motion.js';
 
 export const WIDTH = 1280, HEIGHT = 720, GROUND = 640, STEP = 1 / 120;
 const SAVE_KEY = 'last-bullet-before-dawn-v1';
@@ -20,6 +21,23 @@ export function segmentRect(x1, y1, x2, y2, rect, padding = 0) {
   return tmin >= 0 && tmin <= 1 ? tmin : null;
 }
 const actorRect = a => ({ x: a.x - a.w / 2, y: a.y - a.h, w: a.w, h: a.h });
+// Resolve the first anatomical surface touched, rather than awarding a headshot
+// to a bullet that first travelled through the torso. Walls use the same sweep.
+function actorHit(b, nx, ny, a, player = false) {
+  const top = a.y - a.h;
+  let headRect = { x: a.x - a.w * 0.28, y: top, w: a.w * 0.56, h: 12 }, bodyTop = top + 12;
+  if (player) {
+    const { pose, frame, dir } = getPlayerPose(a);
+    const [hx, hy] = pose === 'roll' ? PLAYER_HEADS.roll[frame] : PLAYER_HEADS[pose];
+    headRect = { x: a.x + (hx - 32) * dir - 8, y: a.y - 64 + hy - 5, w: 16, h: 14 };
+    bodyTop = pose === 'roll' ? Math.min(top, headRect.y + headRect.h) : headRect.y + headRect.h;
+  }
+  const head = segmentRect(b.x, b.y, nx, ny, headRect, b.radius);
+  const body = segmentRect(b.x, b.y, nx, ny, { x: a.x - a.w / 2, y: bodyTop, w: a.w, h: a.y - bodyTop }, b.radius);
+  if (head === null && body === null) return null;
+  const headshot = head !== null && (body === null || head < body);
+  return { t: headshot ? head : body, headshot };
+}
 
 export class Game {
   constructor(options = {}) {
@@ -39,7 +57,7 @@ export class Game {
     this.rewardChoices = []; this.toast = { text: '', time: 0 }; this.notice = '';
     this.input = { keys: new Set(), mouse: { x: 850, y: 380, left: false, right: false }, pressed: new Set() };
     this.accumulator = 0; this.shake = 0; this.flash = 0; this.slowActive = false; this.hitStop = 0;
-    this.stats = { shots: 0, hits: 0, damageTaken: 0, roomsCleared: 0 };
+    this.stats = { shots: 0, hits: 0, headshots: 0, damageTaken: 0, roomsCleared: 0 };
     this.nextEnemyId = 1; this.nextBulletId = 1; this.waveDelay = 0;
     this.bound = false; this.endingSaved = false;
   }
@@ -51,13 +69,13 @@ export class Game {
   getWeapon() { return this.player?.weapons[this.player.weaponIndex] || null; }
   getWeaponDef() { return WEAPONS[this.getWeapon()?.id] || WEAPONS.pistol; }
   magazine(id) { return Math.ceil(WEAPONS[id].magazine * (1 + this.stack('extendedMag') * 0.25)); }
-  createWeapon(id) { return { id, ammo: this.magazine(id), cooldown: 0, reload: 0, reloadTotal: 0, heat: 0, durability: 100, wetness: 0, jammed: false, jamReason: '', clearProgress: 0, maintenance: 0 }; }
+  createWeapon(id) { return { id, ammo: this.magazine(id), cooldown: 0, reload: 0, reloadTotal: 0, heat: 0, durability: 100, wetness: 0, jammed: false, jamReason: '', clearProgress: 0, maintenance: 0, jamGrace: 0 }; }
   startRun(seed) {
     this.seed = (seed ?? Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0; this.rng = seededRandom(this.seed);
     this.weatherRng = seededRandom(this.seed ^ 0x6B24A3D1);
     this.roomIndex = 0; this.zoneIndex = 0; this.time = 0; this.kills = 0; this.score = 0;
-    this.stats = { shots: 0, hits: 0, damageTaken: 0, roomsCleared: 0 }; this.endingSaved = false;
-    this.player = { x: 150, y: GROUND, vx: 0, vy: 0, w: 30, h: 58, hp: 100, maxHp: 100, aim: 0, facing: 1, grounded: true, coyote: 0.1, jumpBuffer: 0, rollTime: 0, rollCooldown: 0, rollDir: 1, invuln: 0, slow: 100, maxSlow: 100, recoil: 0, weaponIndex: 0, weapons: [], upgrades: {}, hurt: 0, muzzle: 0, dodgeBuff: 0, reloadBuff: 0, swapBuff: 0, animation: 0 };
+    this.stats = { shots: 0, hits: 0, headshots: 0, damageTaken: 0, roomsCleared: 0 }; this.endingSaved = false;
+    this.player = { x: 150, y: GROUND, vx: 0, vy: 0, w: 30, h: 58, hp: 50, maxHp: 50, aim: 0, facing: 1, grounded: true, coyote: 0.1, jumpBuffer: 0, rollTime: 0, rollCooldown: 0, rollDir: 1, invuln: 0, slow: 100, maxSlow: 100, recoil: 0, weaponIndex: 0, weapons: [], upgrades: {}, hurt: 0, muzzle: 0, dodgeBuff: 0, reloadBuff: 0, swapBuff: 0, animation: 0 };
     this.player.weapons = [this.createWeapon('pistol')];
     Object.assign(this.player, { crouching: false, sheltered: false, vaultTime: 0, vaultCooldown: 0, vault: null, maintenanceBlocked: false });
     this.clearInput(); this.shake = 0; this.flash = 0; this.hitStop = 0; this.accumulator = 0;
@@ -106,7 +124,8 @@ export class Game {
   update(dt) {
     if (this.mode !== 'playing') return;
     const p = this.player;
-    for (const key of ['invuln', 'hurt', 'rollCooldown', 'vaultCooldown', 'muzzle', 'dodgeBuff', 'reloadBuff', 'swapBuff']) p[key] = Math.max(0, p[key] - dt);
+    for (const key of ['invuln', 'hurt', 'rollCooldown', 'vaultCooldown', 'muzzle', 'dodgeBuff', 'reloadBuff', 'swapBuff', 'landingTime', 'knockbackTime']) p[key] = Math.max(0, p[key] - dt);
+    p.motionTime += dt;
     this.toast.time = Math.max(0, this.toast.time - dt); this.shake = Math.max(0, this.shake - dt * 24); this.flash = Math.max(0, this.flash - dt * 5);
     p.recoil = Math.max(0, p.recoil - dt * 8);
     const press = this.input.pressed;
@@ -119,9 +138,12 @@ export class Game {
     press.clear();
     if (this.mode !== 'playing') return;
     this.updatePlayer(dt);
+    this.updateHazards(dt);
+    if (this.mode !== 'playing') return;
     this.updateWeather(dt);
     this.updateWeaponCondition(dt);
     updateEncounters(this, dt);
+    if (this.mode !== 'playing') return;
     for (const weapon of p.weapons) {
       weapon.cooldown = Math.max(0, weapon.cooldown - dt); weapon.heat = Math.max(0, weapon.heat - dt * 0.8);
       if (weapon.reload > 0) { weapon.reload = Math.max(0, weapon.reload - dt); if (weapon.reload === 0) { weapon.ammo = this.magazine(weapon.id); this.emitSound('reloadDone'); this.notify(`${WEAPONS[weapon.id].name} · 재장전 완료`, 1.2); } }
@@ -147,24 +169,27 @@ export class Game {
       } else {
         p.x = position.x; p.y = position.y; p.vaultTime = Math.max(0, v.duration - v.elapsed);
         p.vx = p.vy = 0; p.grounded = false;
-        if (p.vaultTime === 0) { p.vault = null; p.grounded = true; }
+        if (p.vaultTime === 0) { p.vault = null; p.grounded = true; p.landingTime = 0.18; }
         p.aim = Math.atan2(this.input.mouse.y - (p.y - 38), this.input.mouse.x + this.camera.x - p.x);
         return;
       }
     }
     const wantsCrouch = keys.has('KeyC') && p.grounded && p.rollTime <= 0;
     const headBlocked = this.room.covers.some(c => c.hp > 0 && this.rectOverlaps({ x: p.x - p.w / 2, y: p.y - 58, w: p.w, h: 58 }, c));
-    p.crouching = wantsCrouch || (p.crouching && headBlocked); p.h = p.crouching ? 34 : 58;
+    p.crouching = wantsCrouch || (p.crouching && headBlocked); p.h = p.crouching || p.rollTime > 0 ? 34 : 58;
     p.aim = Math.atan2(this.input.mouse.y - (p.y - (p.crouching ? 21 : 38)), this.input.mouse.x + this.camera.x - p.x);
     p.facing = Math.cos(p.aim) >= 0 ? 1 : -1;
     p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - dt);
     p.jumpBuffer = Math.max(0, p.jumpBuffer - dt);
     if (p.jumpBuffer > 0 && p.coyote > 0 && p.rollTime <= 0 && !headBlocked) { p.crouching = false; p.h = 58; p.vy = -760; p.grounded = false; p.coyote = 0; p.jumpBuffer = 0; this.burst(p.x, p.y, 5, '#828b91', 'smoke'); }
     const move = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-    if (p.rollTime > 0) { p.rollTime = Math.max(0, p.rollTime - dt); p.vx = p.rollDir * 670; if (p.rollTime === 0) p.dodgeBuff = 1.2; }
+    if (p.knockbackTime > 0) { p.vx = p.knockbackX; p.knockbackX *= Math.exp(-dt * 3); }
+    else if (p.rollTime > 0) { p.rollTime = Math.max(0, p.rollTime - dt); p.vx = p.rollDir * 670; if (p.rollTime === 0) { p.dodgeBuff = 1.2; p.h = p.crouching ? 34 : 58; } }
     else p.vx = approach(p.vx, move * (p.crouching ? 130 : 310) * (this.getWeapon().maintenance > 0.25 ? 0.45 : 1) * (1 + 0.1 * this.stack('quickFeet')), (p.grounded ? 2500 : 1700) * dt);
     p.animation += Math.abs(p.vx) * dt / 42;
+    const wasAirborne = !p.grounded && p.vy > 100;
     this.moveActor(p, dt);
+    if (wasAirborne && p.grounded) { p.landingTime = 0.18; this.burst(p.x, p.y, 4, '#65717a', 'smoke'); }
   }
   moveActor(a, dt) {
     const oldX = a.x, oldY = a.y;
@@ -181,30 +206,34 @@ export class Game {
   }
   roll() {
     const p = this.player;
-    if (p.rollCooldown > 0 || p.rollTime > 0 || p.vaultTime > 0) return false;
+    if (p.rollCooldown > 0 || p.rollTime > 0 || p.vaultTime > 0 || p.knockbackTime > 0) return false;
     p.rollDir = (this.input.keys.has('KeyD') ? 1 : 0) - (this.input.keys.has('KeyA') ? 1 : 0) || p.facing;
-    p.rollTime = 0.28; p.rollCooldown = 1.25 * (1 - this.stack('quickFeet') * 0.15); p.invuln = Math.max(p.invuln, 0.24);
+    p.rollTotal = p.rollTime = 0.28; p.rollCooldown = 1.25 * (1 - this.stack('quickFeet') * 0.15); p.invuln = Math.max(p.invuln, 0.24);
     this.emitSound('roll'); this.burst(p.x, p.y - 10, 8, '#7f8c98', 'smoke'); return true;
   }
   rectOverlaps(a, b) { return a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 && a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01; }
   vaultPosition(v, t) {
     const smooth = n => n * n * (3 - 2 * n);
-    if (t < 0.32) return { x: v.startX, y: v.startY + (v.topY - v.startY) * smooth(t / 0.32) };
-    if (t < 0.75) return { x: v.startX + (v.endX - v.startX) * smooth((t - 0.32) / 0.43), y: v.topY };
-    return { x: v.endX, y: v.topY + (v.endY - v.topY) * smooth((t - 0.75) / 0.25) };
+    const plantX = v.plantX ?? v.startX;
+    if (t < 0.16) return { x: v.startX + (plantX - v.startX) * smooth(t / 0.16), y: v.startY };
+    if (t < 0.40) return { x: plantX, y: v.startY + (v.topY - v.startY) * smooth((t - 0.16) / 0.24) };
+    if (t < 0.78) return { x: plantX + (v.endX - plantX) * smooth((t - 0.40) / 0.38), y: v.topY };
+    return { x: v.endX, y: v.topY + (v.endY - v.topY) * smooth((t - 0.78) / 0.22) };
   }
   vault() {
     const p = this.player;
-    if (!p.grounded || p.rollTime > 0 || p.vaultTime > 0 || p.vaultCooldown > 0) return false;
+    if (!p.grounded || p.rollTime > 0 || p.vaultTime > 0 || p.vaultCooldown > 0 || p.knockbackTime > 0) return false;
     const dir = (this.input.keys.has('KeyD') ? 1 : 0) - (this.input.keys.has('KeyA') ? 1 : 0) || p.facing;
     const candidates = this.room.covers.filter(c => c.hp > 0 && p.y - c.y >= 12 && p.y - c.y <= 100 && c.w <= 130)
       .map(c => ({ c, gap: dir > 0 ? c.x - (p.x + p.w / 2) : p.x - p.w / 2 - (c.x + c.w) }))
       .filter(item => item.gap >= -0.1 && item.gap <= 54).sort((a, b) => a.gap - b.gap);
     const obstacle = candidates[0]?.c;
     if (!obstacle) { this.notify('낮은 상자나 담 가까이에서 F · 높이 100 이하', 1.3); return false; }
+    if (obstacle.vaultable === false || obstacle.kind === 'wire') { this.notify('철조망 · 손을 짚을 수 없습니다. 충분히 높게 점프하세요', 2); return false; }
     const endX = dir > 0 ? obstacle.x + obstacle.w + p.w / 2 + 10 : obstacle.x - p.w / 2 - 10;
     if (endX < p.w / 2 + 8 || endX > this.room.width - p.w / 2 - 8) return false;
-    const v = { startX: p.x, startY: p.y, endX, endY: p.y, topY: obstacle.y - 8, duration: 0.55, elapsed: 0 };
+    const v = { startX: p.x, startY: p.y, endX, endY: p.y, topY: obstacle.y - 8, duration: obstacle.kind === 'barricade' ? 0.48 : 0.55, elapsed: 0, kind: obstacle.kind === 'barricade' ? 'barricade' : 'cover', obstacleX: obstacle.x, obstacleY: obstacle.y, obstacleW: obstacle.w, dir };
+    v.plantX = dir > 0 ? obstacle.x - p.w / 2 - 2 : obstacle.x + obstacle.w + p.w / 2 + 2;
     for (let sample = 0; sample <= 40; sample++) {
       const point = this.vaultPosition(v, sample / 40), rect = { x: point.x - p.w / 2, y: point.y - 58, w: p.w, h: 58 };
       if (this.room.covers.some(c => c.hp > 0 && this.rectOverlaps(rect, c))) { this.notify('넘어갈 공간이 부족합니다', 1.2); return false; }
@@ -221,12 +250,12 @@ export class Game {
       if (w.timer <= 0) {
         w.target = w.target > 0 ? 0 : 0.65 + this.weatherRng() * 0.35;
         w.timer = w.target > 0 ? 16 + this.weatherRng() * 10 : 22 + this.weatherRng() * 20;
-        this.notify(w.target > 0 ? '소나기 · 차양 아래에서 총기를 보호하세요' : '비가 잦아든다 · 젖은 총을 정비할 시간', 3);
+        this.notify(w.target > 0 ? '소나기 · 빗물이 총에 쌓인다. R을 길게 눌러 점검' : '비가 잦아든다 · 젖음은 총기 점검으로만 제거', 3);
       }
       w.intensity = approach(w.intensity, w.target, dt * 0.28);
       w.kindlabel = w.intensity > 0.15 ? '소나기' : '비 그침';
     }
-    p.sheltered = !this.room.weatherAllowed || (this.room.shelters || []).some(s => p.x >= s.x && p.x <= s.x + s.w && p.y - p.h >= s.y);
+    p.sheltered = false;
   }
   jamWeapon(weapon, reason) {
     if (weapon.jammed) return;
@@ -240,24 +269,25 @@ export class Game {
     weapon.clearProgress = Math.min(5, weapon.clearProgress + 1); this.emitSound('reload');
     if (weapon.clearProgress < 5) { this.notify(`총기 복구 ${weapon.clearProgress}/5 · R 연타`, 1.5); return false; }
     weapon.jammed = false; weapon.jamReason = ''; weapon.clearProgress = 0;
-    weapon.wetness = Math.min(30, weapon.wetness); weapon.durability = Math.max(35, weapon.durability);
+    weapon.durability = Math.max(35, weapon.durability); weapon.jamGrace = 5;
     this.player.maintenanceBlocked = true;
-    this.notify('작동 복구 · 내구도는 R을 길게 눌러 정비', 2.5); this.emitSound('reloadDone'); return true;
+    this.notify('작동 복구 · 젖음 유지! 5초 안에 R을 다시 길게 눌러 점검', 3); this.emitSound('reloadDone'); return true;
   }
   updateWeaponCondition(dt) {
     const p = this.player, active = this.getWeapon(), held = this.input.keys.has('KeyR');
     if (!held) p.maintenanceBlocked = false;
     for (const weapon of p.weapons) {
-      const exposed = weapon === active && !p.sheltered && this.weather.intensity > 0.05;
+      const exposed = weapon === active && this.room.weatherAllowed && this.weather.intensity > 0.05;
+      weapon.jamGrace = Math.max(0, (weapon.jamGrace || 0) - dt);
       const previousWetness = weapon.wetness;
-      weapon.wetness = clamp(weapon.wetness + dt * (exposed ? this.weather.intensity * 7 : weapon === active ? -8 : -3), 0, 100);
-      if (weapon === active && previousWetness < 65 && weapon.wetness >= 65 && !weapon.jammed) this.notify('총이 젖고 있습니다 · 차양으로 이동하거나 R을 길게 눌러 정비', 3);
-      if (weapon.wetness >= 85) this.jamWeapon(weapon, 'rain');
+      weapon.wetness = clamp(weapon.wetness + dt * (exposed ? this.weather.intensity * 7 : 0), 0, 100);
+      if (weapon === active && previousWetness < 65 && weapon.wetness >= 65 && !weapon.jammed) this.notify('총이 젖고 있습니다 · R을 1.4초 길게 눌러 점검', 3);
+      if (weapon.wetness >= 85 && weapon.jamGrace <= 0) this.jamWeapon(weapon, 'rain');
       if (weapon !== active || !held || weapon.jammed || p.maintenanceBlocked || p.rollTime > 0 || p.vaultTime > 0 || (weapon.durability >= 100 && weapon.wetness <= 0)) { weapon.maintenance = 0; continue; }
       weapon.maintenance += dt;
       if (weapon.maintenance >= 1.4) {
-        weapon.durability = 100; weapon.wetness = Math.max(0, weapon.wetness - 45); weapon.maintenance = 0;
-        p.maintenanceBlocked = true; this.notify('현장 정비 완료 · 내구도 100 / 젖음 −45', 2); this.emitSound('reloadDone');
+        weapon.durability = 100; weapon.wetness = 0; weapon.maintenance = 0; weapon.jamGrace = 0;
+        p.maintenanceBlocked = true; this.notify('총기 점검 완료 · 내구도 100 / 젖음 0%', 2); this.emitSound('reloadDone');
       }
     }
   }
@@ -304,17 +334,20 @@ export class Game {
       b.life -= dt; b.travel += Math.hypot(nx - b.x, ny - b.y);
       const hits = [];
       for (const c of [...this.room.covers, ...this.room.platforms]) { if (c.hp !== undefined && c.hp <= 0) continue; const t = segmentRect(b.x, b.y, nx, ny, c, b.radius); if (t !== null) hits.push({ t, kind: 'wall', target: c }); }
-      if (b.owner === 'player') for (const enemy of this.enemies) { if (enemy.dead || enemy.spawnTime > 0 || b.hitIds.has(enemy.id)) continue; const t = segmentRect(b.x, b.y, nx, ny, actorRect(enemy), b.radius); if (t !== null) hits.push({ t, kind: 'enemy', target: enemy }); }
-      else { const t = segmentRect(b.x, b.y, nx, ny, actorRect(this.player), b.radius); if (t !== null) hits.push({ t, kind: 'player', target: this.player }); }
+      if (b.owner === 'player') for (const enemy of this.enemies) { if (enemy.dead || enemy.spawnTime > 0 || b.hitIds.has(enemy.id)) continue; const hit = actorHit(b, nx, ny, enemy); if (hit) hits.push({ ...hit, kind: 'enemy', target: enemy }); }
+      else { const hit = actorHit(b, nx, ny, this.player, true); if (hit) hits.push({ ...hit, kind: 'player', target: this.player }); }
       hits.sort((a, c) => a.t - c.t);
       for (const hit of hits) {
         const hx = b.x + (nx - b.x) * hit.t, hy = b.y + (ny - b.y) * hit.t;
         if (hit.kind === 'wall') { const c = hit.target; if (c.destructible && c.hp > 0) { c.hp -= b.damage; if (c.hp <= 0) { this.burst(c.x + c.w / 2, c.y + c.h / 2, 18, '#a88b67'); this.emitSound('hit'); } } this.burst(hx, hy, 4, '#ddb875'); b.life = -1; break; }
-        if (hit.kind === 'player') { this.damagePlayer(b.damage); b.life = -1; if (this.mode !== 'playing') return; break; }
+        if (hit.kind === 'player') { this.damagePlayer(b.damage * (hit.headshot ? 1.5 : 1), { headshot: hit.headshot }); b.life = -1; if (this.mode !== 'playing') return; break; }
         const e = hit.target; let damage = b.damage;
+        const headshot = hit.headshot && (b.weaponId === 'pistol' || b.weaponId === 'revolver');
+        if (headshot) damage *= WEAPONS[b.weaponId].headMultiplier;
         if (b.weaponId === 'shotgun') damage *= clamp(1 - Math.max(0, b.travel - 150) / 720, 0.28, 1);
         if (Math.hypot(e.x - b.originX, e.y - b.originY) <= 300) damage *= 1 + this.stack('closeRange') * 0.25;
         b.hitIds.add(e.id); this.damageEnemy(e, damage); this.stats.hits++;
+        if (headshot) { this.stats.headshots++; this.particles.push({ x: hx, y: hy - 14, vx: 0, vy: -32, life: 0.7, maxLife: 0.7, size: 12, type: 'text', text: '헤드샷 ×2', color: '#f4d799' }); }
         this.burst(hx, hy, 5, '#c24b45', 'blood');
         if (b.pierce > 0) b.pierce--; else { b.life = -1; break; }
       }
@@ -323,11 +356,28 @@ export class Game {
     }
     this.bullets = this.bullets.filter(b => b.life > 0); this.room.covers = this.room.covers.filter(c => c.hp > 0);
   }
-  damagePlayer(amount) {
-    const p = this.player; if (this.mode !== 'playing' || p.invuln > 0 || p.hp <= 0) return false;
-    p.hp = Math.max(0, p.hp - amount); p.invuln = 0.65; p.hurt = 0.3; this.stats.damageTaken += amount;
+  damagePlayer(amount, { headshot = false, hazard = false } = {}) {
+    const p = this.player; if (this.mode !== 'playing' || (!hazard && p.invuln > 0) || p.hp <= 0) return false;
+    p.hp = Math.max(0, p.hp - amount); if (!hazard) p.invuln = 0.65; p.hurt = 0.3; this.stats.damageTaken += amount;
     this.shake = 9; this.flash = 0.5; this.emitSound('hurt'); this.burst(p.x, p.y - 30, 10, '#c34849', 'blood');
-    if (p.hp <= 0) this.endRun(false); else this.notify(`피격 −${Math.round(amount)} · 엄폐하거나 회피하세요`, 1.2); return true;
+    if (p.hp <= 0) this.endRun(false); else this.notify(hazard ? `철조망 −${Math.round(amount)} · 가시에서 벗어나세요` : `${headshot ? '머리 피격 ×1.5' : '피격'} −${Math.round(amount)} · 엄폐하거나 회피하세요`, 1.2); return true;
+  }
+  updateHazards(dt) {
+    const p = this.player;
+    p.wireCooldown = Math.max(0, p.wireCooldown - dt);
+    if (p.wireCooldown > 0) return;
+    const contact = (this.room.hazards || []).find(h => h.kind === 'wire' && this.rectOverlaps(actorRect(p), h));
+    if (contact) { p.wireCooldown = contact.interval || 0.5; this.damagePlayer(contact.damage || 3, { hazard: true }); }
+  }
+  applyVehicleImpact(event, { speed, direction }) {
+    const damage = clamp(Math.round(speed * 0.025), 8, 30);
+    if (!this.damagePlayer(damage)) return false;
+    const p = this.player;
+    p.knockbackX = clamp(speed * 0.45, 120, 560) * direction; p.knockbackTime = 0.32;
+    p.vx = p.knockbackX; p.vy = -clamp(speed * 0.16, 100, 240); p.grounded = false;
+    p.vault = null; p.vaultTime = 0; p.rollTime = 0; p.coyote = 0; p.jumpBuffer = 0;
+    if (this.mode === 'playing') this.notify(`차량 충돌 −${damage} · 헤드라이트를 보면 점프하거나 회피`, 2);
+    return true;
   }
   damageEnemy(enemy, damage) {
     if (this.mode !== 'playing' || this.player.hp <= 0 || enemy.dead || enemy.spawnTime > 0) return false;
@@ -344,7 +394,7 @@ export class Game {
   }
   spawnEnemy(point, warning = 1) {
     const def = ENEMY_TYPES[point.type];
-    const enemy = { ...def, type: point.type, id: this.nextEnemyId++, x: point.x, y: point.y, vx: 0, vy: 0, hp: def.hp, maxHp: def.hp, aim: Math.PI, facing: -1, state: 'idle', timer: 0.5 + this.rng() * 1.1, flash: 0, muzzle: 0, phase: 1, pattern: 'fan', patternIndex: 0, spawnTime: warning, grounded: true, dead: false, attackHit: false, burstLeft: 0, shotTimer: 0, windupTotal: def.windup, animation: 0 };
+    const enemy = { ...def, type: point.type, id: this.nextEnemyId++, x: point.x, y: point.y, vx: 0, vy: 0, hp: def.hp, maxHp: def.hp, aim: Math.PI, facing: -1, state: 'idle', timer: 0.5 + this.rng() * 1.1, flash: 0, muzzle: 0, phase: 1, pattern: 'fan', patternIndex: 0, spawnTime: warning, grounded: true, dead: false, attackHit: false, burstLeft: 0, shotTimer: 0, windupTotal: def.windup, animation: 0, jumpCooldown: 0, airDashTime: 0, airDashDir: 0 };
     this.enemies.push(enemy); return enemy;
   }
   spawnWave() { createEncounter(this); }
@@ -364,11 +414,15 @@ export class Game {
     e.facing = dx >= 0 ? 1 : -1;
     if (e.state !== 'windup' && e.state !== 'attack') e.aim = Math.atan2(dy, dx);
     e.timer -= dt;
+    e.jumpCooldown = Math.max(0, e.jumpCooldown - dt); e.airDashTime = Math.max(0, e.airDashTime - dt);
     if (e.type === 'boss') { this.updateBoss(e, dt, dx, dist); this.moveActor(e, dt); return; }
     if (e.state === 'idle') {
       const desiredRange = e.type === 'rusher' ? 90 : e.type === 'shotgun' ? 300 : Math.min(e.range * 0.65, 650);
       e.vx = Math.abs(dx) > desiredRange ? e.facing * e.speed : e.type !== 'rusher' && Math.abs(dx) < 140 ? -e.facing * e.speed * 0.7 : 0;
-      if (e.timer <= 0 && dist < (e.type === 'rusher' ? 300 : e.range)) {
+      const obstacleAhead = e.type === 'rusher' && this.room.covers.some(c => c.hp > 0 && e.y > c.y + 5 && e.y - c.y < 150 && (e.facing > 0 ? c.x - (e.x + e.w / 2) : e.x - e.w / 2 - c.x - c.w) >= -2 && (e.facing > 0 ? c.x - (e.x + e.w / 2) : e.x - e.w / 2 - c.x - c.w) < 85);
+      const leap = e.type === 'rusher' && e.grounded && e.jumpCooldown <= 0 && (obstacleAhead || (p.y < e.y - 45 && Math.abs(dx) < 440));
+      if (leap || (e.timer <= 0 && dist < (e.type === 'rusher' ? 330 : e.range))) {
+        e.pattern = leap ? 'leap' : 'dash';
         e.state = 'windup'; e.timer = e.windup; e.windupTotal = e.windup; e.lockedAim = e.aim; e.vx = 0;
       }
     } else if (e.state === 'windup') {
@@ -377,18 +431,21 @@ export class Game {
       if (e.timer > 0.32) { e.aim = Math.atan2(dy, dx); e.lockedAim = e.aim; }
       if (e.timer <= 0) {
         e.state = 'attack'; e.lockedAim = e.aim; e.attackHit = false;
-        if (e.type === 'rusher') { e.timer = 0.36; e.chargeDir = Math.cos(e.lockedAim) >= 0 ? 1 : -1; }
+        if (e.type === 'rusher') {
+          e.chargeDir = Math.cos(e.lockedAim) >= 0 ? 1 : -1; e.timer = e.pattern === 'leap' ? 0.68 : 0.36;
+          if (e.pattern === 'leap') { e.vy = -740; e.grounded = false; e.airDashTime = 0.40; e.airDashDir = e.chargeDir; e.jumpCooldown = 1.2; }
+        }
         else if (e.type === 'smg') { e.burstLeft = 5; e.shotTimer = 0; e.timer = 0.68; }
         else { this.enemyShot(e, e.lockedAim, { count: e.type === 'shotgun' ? 5 : e.type === 'heavy' ? 3 : 1, spread: e.type === 'shotgun' ? 0.5 : e.type === 'heavy' ? 0.16 : 0, speed: e.type === 'heavy' ? 310 : 360 }); e.timer = 0.12; }
       }
     } else if (e.state === 'attack') {
-      e.vx = e.type === 'rusher' ? e.chargeDir * 530 : 0;
+      e.vx = e.type === 'rusher' ? e.chargeDir * (e.pattern === 'leap' ? (e.airDashTime > 0 ? 660 : 420) : 620) : 0;
       if (e.type === 'rusher' && !e.attackHit && Math.abs(dx) < 44 && Math.abs(p.y - e.y) < 55) { this.damagePlayer(e.damage); e.attackHit = true; }
       if (e.type === 'smg') { e.shotTimer -= dt; if (e.shotTimer <= 0 && e.burstLeft > 0) { this.enemyShot(e, e.lockedAim + (this.rng() - 0.5) * 0.12, { speed: 380 }); e.burstLeft--; e.shotTimer = 0.13; } }
       if (e.timer <= 0) { e.state = 'recover'; e.timer = e.interval; e.vx = 0; }
     } else if (e.state === 'recover') { e.vx = 0; if (e.timer <= 0) { e.state = 'idle'; e.timer = 0.15; } }
     // Chase enemies can jump low cover and follow players off ledges.
-    if (e.grounded && e.vx !== 0 && this.room.covers.some(c => c.hp > 0 && Math.abs(c.x + c.w / 2 - e.x) < c.w / 2 + e.w / 2 + 12 && e.y > c.y + 5)) e.vy = -610;
+    if (e.type !== 'rusher' && e.grounded && e.vx !== 0 && this.room.covers.some(c => c.hp > 0 && Math.abs(c.x + c.w / 2 - e.x) < c.w / 2 + e.w / 2 + 12 && e.y > c.y + 5)) e.vy = -610;
     e.animation += Math.abs(e.vx) * dt / 40; this.moveActor(e, dt);
   }
   updateBoss(e, dt, dx, dist) {
@@ -445,7 +502,7 @@ export class Game {
     this.room.cleared = false; this.room.rewardTaken = false; this.room.wave = 1; this.room.totalWaves = this.room.boss ? 1 : 3;
     this.player.x = 150; this.player.y = GROUND; this.player.vx = this.player.vy = 0; this.player.invuln = 1; this.camera.x = 0; this.waveDelay = 0;
     this.player.rollTime = 0; this.player.rollCooldown = 0; this.player.jumpBuffer = 0; this.player.grounded = true; this.player.coyote = 0.1;
-    Object.assign(this.player, { crouching: false, h: 58, vault: null, vaultTime: 0, vaultCooldown: 0, sheltered: false, maintenanceBlocked: false });
+    Object.assign(this.player, { crouching: false, h: 58, vault: null, vaultTime: 0, vaultCooldown: 0, sheltered: false, maintenanceBlocked: false, motionTime: 0, landingTime: 0, rollTotal: 0.28, knockbackTime: 0, knockbackX: 0, wireCooldown: 0 });
     for (const weapon of this.player.weapons) weapon.maintenance = 0;
     this.weather = { intensity: 0, target: 0, timer: 7 + this.weatherRng() * 8, elapsed: 0, kindlabel: this.room.weatherAllowed ? '비 그침' : '실내 · 비 없음' };
     this.spawnWave();
@@ -463,7 +520,7 @@ export class Game {
         const existing = p.weapons.find(w => w.id === pickup.weaponId);
         if (existing) {
           existing.ammo = Math.min(this.magazine(existing.id), Math.max(existing.ammo, incoming.ammo)); existing.reload = 0;
-          existing.durability = Math.max(existing.durability, incoming.durability); existing.wetness = Math.min(existing.wetness, incoming.wetness);
+          existing.durability = Math.max(existing.durability, incoming.durability);
           existing.jammed = existing.jammed && incoming.jammed; if (!existing.jammed) { existing.jamReason = ''; existing.clearProgress = 0; }
           this.notify(`${WEAPONS[existing.id].name} · 탄약과 양호한 부품 확보`);
         }

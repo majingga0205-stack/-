@@ -285,7 +285,7 @@ function station(ctx, camera, variant, time) {
       rect(ctx, x + 150, 112, 230, 8, '#212c34');
       for (let cable = 0; cable < 4; cable++) rect(ctx, x, 242 + cable * 14, 380, 3, '#303b41');
     }
-    for (let i = 0; i < 5; i++) trainCar(ctx, i * 660 + 60 - shift, 605, 620, false, i % 3 === 0);
+    for (let i = 0; i < 5; i++) { ctx.save(); ctx.translate(i * 540 + 60 - shift, 550); ctx.scale(.7, .7); trainCar(ctx, 0, 0, 620, false, true); ctx.restore(); }
     const signal = 1050 - camera * .85;
     rect(ctx, signal, 268, 8, 372, '#28313a'); rect(ctx, signal - 14, 258, 36, 78, '#070c11');
     rect(ctx, signal - 4, 270, 16, 16, '#ba5546'); rect(ctx, signal - 4, 300, 16, 16, '#292b28');
@@ -421,17 +421,6 @@ function floor(ctx, room, camera, variant, wet) {
   rect(ctx, 0, 714, W, 6, '#080d14');
 }
 
-function shelter(ctx, cover, camera) {
-  const x = cover.x - camera, y = cover.y, w = cover.w, h = cover.h || 12;
-  rect(ctx, x - 4, y - 8, w + 8, h + 8, '#0a121b');
-  for (let stripe = 0; stripe < w / 20; stripe++) rect(ctx, x + stripe * 20, y - 4, Math.min(20, w - stripe * 20), h + 4, stripe % 2 ? '#324247' : '#493c36');
-  rect(ctx, x - 4, y + h, w + 8, 4, '#697169');
-  rect(ctx, x + 5, y + h + 4, 4, FLOOR - y - h - 4, '#1d2c34');
-  rect(ctx, x + w - 9, y + h + 4, 4, FLOOR - y - h - 4, '#1d2c34');
-  rect(ctx, x + 12, y - 27, 88, 17, '#111d24');
-  text(ctx, '비 가림', x + 56, y - 18, '#8eada5', 11, 'center');
-}
-
 export function drawScene(ctx, game, camera = 0, time = 0) {
   const room = game.room || {}, variant = Math.max(0, Math.min(8, room.variant ?? room.index ?? 0));
   ctx.save(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -445,7 +434,6 @@ export function drawScene(ctx, game, camera = 0, time = 0) {
     const first = Math.floor(camera / 760);
     for (let i = first; i < first + 3; i++) lamp(ctx, 290 + i * 760 - camera, variant >= 6 ? 340 : 314, variant >= 6 ? 300 : 326);
   }
-  for (const canopy of room.shelters || []) shelter(ctx, canopy, camera);
   // Route plaques are part of the environment and change in every room.
   const plaqueX = 72 - camera * .76;
   if (plaqueX > -390) {
@@ -461,15 +449,12 @@ export function drawWeather(ctx, game, camera = 0, time = 0) {
   const room = game.room || {};
   const intensity = Math.max(0, Math.min(1, game.weather?.intensity || 0));
   if (room.theme === 'subway' || room.weatherAllowed === false || intensity <= .01) return;
-  const shelters = room.shelters || [];
   ctx.save();
   const count = Math.round(240 * intensity);
   for (let i = 0; i < count; i++) {
     const speed = 430 + fraction(i + 500) * 330;
     const y = (fraction(i + 3) * 760 + time * speed) % 760 - 30;
     const x = ((fraction(i + 30) * 1440 - time * 115 - camera * .12) % 1440 + 1440) % 1440 - 80;
-    const worldX = x + camera;
-    if (shelters.some(s => worldX >= s.x && worldX <= s.x + s.w && y >= s.y)) continue;
     ctx.globalAlpha = (.14 + fraction(i + 12) * .22) * intensity;
     rect(ctx, x, y, 2, 6, '#9daeb8'); rect(ctx, x - 2, y + 6, 2, 6, '#778f9f');
     if (y > 636 && y < 661) {
@@ -482,7 +467,7 @@ export function drawWeather(ctx, game, camera = 0, time = 0) {
 function car(ctx, x, y, event, boss = false) {
   const dir = event.facing || -1, elapsed = event.elapsed || 0;
   const phase = event.phase || 'approach';
-  const drift = boss && phase === 'approach';
+  const drift = boss && phase === 'approach' && (event.drift || 0) > .03;
   const shake = drift ? Math.sin(elapsed * 22) * 2 : 0;
   ctx.save(); ctx.translate(SNAP(x), SNAP(y)); ctx.scale(dir < 0 ? -1 : 1, 1);
   if (drift) ctx.transform(1, 0, (event.drift || 0) * 2, 1, 0, -Math.abs(event.drift || 0) * 18);
@@ -518,7 +503,7 @@ function car(ctx, x, y, event, boss = false) {
   }
   rect(ctx, 105, -45, 10, 10, '#d5c28f'); rect(ctx, -114, -43, 6, 8, '#a84940');
   rect(ctx, 115, -25, 7, 8, '#8b8a7e'); rect(ctx, -120, -25, 8, 8, '#777c73');
-  if (phase === 'approach' || phase === 'unload') {
+  if (phase === 'approach' || phase === 'unload' || phase === 'departureWarning') {
     ctx.save(); ctx.globalAlpha = .055;
     for (let i = 0; i < 10; i++) rect(ctx, 120 + i * 14, -45 - i * 2, 14, 12 + i * 4, '#d4c391');
     ctx.restore();
@@ -553,17 +538,82 @@ function trainCar(ctx, x, y, width = 520, doorOpen = false, dark = false) {
   for (const wx of [52, width - 72]) rect(ctx, x + wx, y - 4, 40, 10, '#060b11');
 }
 
-export function drawArrivals(ctx, game, camera = 0, time = 0) {
+function rearTrack(ctx, game, camera, time) {
+  const events = (game.arrivals || []).filter(event => event.kind === 'train');
+  if (!events.length) return;
+  const maintenance = game.room.variant === 5;
+  const baseY = maintenance ? 334 : 556;
+  // Separate tracks end well above the playable platform; they are scenery,
+  // never a collision body. Their desaturated windows sit behind the pillars.
   ctx.save();
+  ctx.beginPath(); ctx.rect(camera - 2, maintenance ? 190 : 350, W + 4, maintenance ? 152 : 224); ctx.clip();
+  rect(ctx, camera - 2, maintenance ? 190 : 350, W + 4, maintenance ? 152 : 224, '#090f16');
+  const scale = maintenance ? .53 : .7;
+  for (const event of events) {
+    const x = camera + (event.x - camera) * .82;
+    if (x < camera - 500 || x > camera + W + 500) continue;
+    ctx.save(); ctx.translate(SNAP(x), baseY); ctx.scale(scale, scale);
+    ctx.globalAlpha = .75;
+    trainCar(ctx, -220, 0, 440, event.doorOpen || event.phase === 'unload', true);
+    ctx.restore();
+  }
+  pixelLine(ctx, camera, baseY + 5, camera + W, baseY + 5, '#273641', 3);
+  pixelLine(ctx, camera, baseY + 13, camera + W, baseY + 13, '#1a2630', 2);
+  ctx.restore();
+  // Foreground architecture is re-stamped over rear traffic, so even station
+  // pillars and maintenance pipes unambiguously remain in front of the train.
+  const shift = camera * .62;
+  if (game.room.variant === 3) {
+    for (let i = 0; i < 8; i++) {
+      const x = camera + i * 410 - shift + 40;
+      rect(ctx, x, 118, 24, 522, '#0a1117'); rect(ctx, x + 4, 126, 4, 510, '#364244');
+      rect(ctx, x - 12, 112, 48, 16, '#354042');
+      if (i % 3 !== 0) { rect(ctx, x + 105, 549, 170, 10, '#574a36'); rect(ctx, x + 120, 559, 6, 62, '#1e292f'); rect(ctx, x + 254, 559, 6, 62, '#1e292f'); }
+    }
+  } else if (game.room.variant === 4) {
+    for (let i = -1; i < 8; i++) {
+      const x = camera + i * 380 - shift % 380;
+      rect(ctx, x, 142, 22, 498, '#212c34');
+      for (let cable = 0; cable < 4; cable++) rect(ctx, x, 242 + cable * 14, 380, 3, '#303b41');
+    }
+  } else {
+    for (let row = 0; row < 4; row++) {
+      rect(ctx, camera, 218 + row * 34, W, 20, row % 2 ? '#3d403a' : '#2d373d');
+      rect(ctx, camera, 221 + row * 34, W, 3, '#596052');
+    }
+  }
+  text(ctx, '후방 선로 · 통과 열차', camera + W - 110, maintenance ? 174 : 332, '#73888f', 11, 'center');
+}
+
+export function drawArrivals(ctx, game, camera = 0, time = 0, layer = 'front') {
+  if (layer === 'back') { rearTrack(ctx, game, camera, time); return; }
+  ctx.save();
+  const warnedSides = new Set();
   for (const event of game.arrivals || []) {
+    if (event.kind === 'train') continue;
     const x = event.x ?? event.toX ?? 0, y = event.y ?? FLOOR;
+    const vehicle = event.kind === 'car' || event.kind === 'bossCar';
+    const outsideView = x < camera - 80 || x > camera + W + 80;
+    const side = x < camera + W / 2 ? -1 : 1;
+    const headingIntoView = side < 0 ? (event.velocity || 0) > 70 : (event.velocity || 0) < -70;
+    const departingIntoView = event.phase === 'departureWarning' && outsideView && (side < 0 ? event.facing > 0 : event.facing < 0);
+    const movingIntoView = outsideView && headingIntoView && (event.phase === 'approach' || event.phase === 'depart');
+    if (vehicle && (event.phase === 'warning' || departingIntoView || movingIntoView)) {
+      if (!warnedSides.has(side)) {
+        warnedSides.add(side);
+        const markerX = camera + (side > 0 ? W - 170 : 170);
+        rect(ctx, markerX - 147, 502, 294, 32, '#171219');
+        rect(ctx, markerX - 147, 502, 4, 32, '#bd7055');
+        const warning = event.phase === 'departureWarning' ? '차량 출발' : '차량 진입';
+        text(ctx, side > 0 ? `← ${warning} · 점프 / 회피` : `${warning} → · 점프 / 회피`, markerX, 518, '#dfad78', 14, 'center');
+      }
+    }
     if (x < camera - 760 || x > camera + W + 760) continue;
-    if (event.kind === 'car' || event.kind === 'bossCar') {
+    if (vehicle) {
       car(ctx, x, y, event, event.kind === 'bossCar');
-      if (event.kind === 'bossCar' && event.phase === 'approach') text(ctx, '검은 차량 접근 · 회피 공간 확보', x, y - 126, '#d7ad7b', 14, 'center');
-    } else if (event.kind === 'train') {
-      trainCar(ctx, x - 220, y, 440, event.doorOpen || event.phase === 'unload');
-      if (event.phase === 'approach') text(ctx, '회송 열차 진입', x, y - 252, '#cbb680', 12, 'center');
+      if (event.phase === 'departureWarning') text(ctx, '차량 출발 준비 · 점프 / 회피', x, y - 126, '#e7b685', 14, 'center');
+      else if (event.phase === 'approach' && event.kind === 'bossCar') text(ctx, '검은 차량 접근 · 충돌 주의', x, y - 126, '#d7ad7b', 14, 'center');
+      else if (event.phase === 'depart' && (event.speed || 0) > 70) text(ctx, '차량 통과', x, y - 112, '#c99d77', 11, 'center');
     } else if (event.kind === 'door') {
       rect(ctx, x - 37, y - 94, 74, 94, '#050b11');
       rect(ctx, x - 43, y - 100, 86, 6, '#596052');

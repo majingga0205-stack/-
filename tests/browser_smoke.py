@@ -90,6 +90,7 @@ with sync_playwright() as playwright:
     # button in a chord, so direct state changes cannot catch this regression.
     page.evaluate('''() => {
       const g=__game; g.enemies=[]; g.bullets=[]; g.room.covers=[]; g.room.platforms=[];
+      g.room.hazards=[];g.arrivals=[];g.room.weatherAllowed=false;
       g.room.wave=1; g.waveDelay=999; g.player.invuln=100; g.player.slow=100;
       Object.assign(g.getWeapon(),{ammo:12,reload:0,cooldown:0,jammed:false,durability:100,wetness:0});
     }''')
@@ -131,6 +132,34 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(900)
     assert page.evaluate('__game.player.x') > 360, 'F must cross the near crate'
 
+    # A thin barricade has its own hand-plant vault; wire refuses F and hurts
+    # periodically even while the fixture has ordinary bullet invulnerability.
+    page.evaluate('''() => {
+      const g=__game;Object.assign(g.player,{x:250,y:640,vx:0,vy:0,grounded:true,vaultCooldown:0});
+      g.room.covers=[{x:285,y:572,w:22,h:68,hp:99999,destructible:false,kind:'barricade',vaultable:true}];
+    }''')
+    page.keyboard.press('f')
+    page.wait_for_timeout(90)
+    assert page.evaluate('__game.player.vault.kind') == 'barricade'
+    page.screenshot(path=str(OUT / 'barricade-vault.png'))
+    page.wait_for_timeout(650)
+    assert page.evaluate('__game.player.x') > 325
+    page.evaluate('''() => {
+      const g=__game;Object.assign(g.player,{x:250,y:640,vx:0,vy:0,grounded:true,vaultCooldown:0});
+      Object.assign(g.room.covers[0],{kind:'wire',vaultable:false});
+    }''')
+    page.keyboard.press('f')
+    page.wait_for_timeout(70)
+    assert page.evaluate('__game.player.vaultTime') == 0
+    assert page.evaluate('__game.player.x') == 250
+    page.evaluate('''() => {
+      const g=__game;g.room.covers=[];g.room.hazards=[{kind:'wire',x:225,y:630,w:80,h:10,damage:3,interval:.5}];
+      g.player.hp=50;g.player.wireCooldown=0;
+    }''')
+    page.wait_for_timeout(180)
+    assert page.evaluate('__game.player.hp') == 47
+    page.evaluate('__game.room.hazards=[]')
+
     # A held R and auto-repeat keydowns are not distinct jam-clearing taps.
     page.evaluate('''() => {
       const g=__game;g.room.covers=[];
@@ -148,12 +177,14 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(65)
     assert not page.evaluate('__game.getWeapon().jammed')
     assert page.evaluate('__game.getWeapon().durability') >= 35
-    assert page.evaluate('__game.getWeapon().wetness') <= 30
+    assert page.evaluate('__game.getWeapon().wetness') == 100
+    assert page.evaluate('__game.getWeapon().jamGrace') > 4
     page.keyboard.down('r')
     page.wait_for_timeout(1700)
     page.keyboard.up('r')
     assert page.evaluate('__game.getWeapon().durability') == 100
-    print('PASS: real two-button slow/fire chords in both orders, independent release, crouch, vault, distinct R jam taps, maintenance')
+    assert page.evaluate('__game.getWeapon().wetness') == 0
+    print('PASS: real two-button slow/fire chords, crouch, crate/barricade vault, wire rejection/contact, distinct R jam taps, inspection-only drying')
 
     # Fixed combat fixture, but damage is delivered with real aiming + mouse fire.
     page.evaluate('''() => {
@@ -161,14 +192,16 @@ with sync_playwright() as playwright:
       g.player.invuln=5; g.camera.x=0; g.room.covers=[]; g.room.platforms=[];g.bullets=[];
       g.enemies=[];g.spawnEnemy({type:'pistol',x:490,y:640},0);
     }''')
-    aim(490, 610)
+    heads_before = page.evaluate('__game.stats.headshots')
+    aim(490, 592)
     page.mouse.down()
     page.wait_for_timeout(1100)
     page.mouse.up()
     assert page.evaluate('__game.kills') >= 1
-    assert page.evaluate('__game.stats.hits') >= 3
+    assert page.evaluate('__game.stats.hits') >= 2
+    assert page.evaluate('__game.stats.headshots') > heads_before
     page.screenshot(path=str(OUT / 'combat.png'))
-    print('PASS: real keyboard/mouse movement, pickup, swap, fire, hit/kill, reload, roll, slow, pause/settings')
+    print('PASS: real keyboard/mouse movement, pickup, swap, headshot/kill, reload, roll, slow, pause/settings')
 
     page.evaluate('__game.startRun(271828)')
     for room_index in range(8):
@@ -213,7 +246,7 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(250)
     assert page.evaluate('JSON.stringify([__game.arrivals,__game.weather,__game.getWeapon(),__game.player.vaultCooldown])') == intro_state
     page.get_by_role('button', name='계속하기').click()
-    page.wait_for_timeout(1050)
+    page.wait_for_function('__game.bossIntro?.doorOpen', timeout=4000)
     assert page.evaluate('__game.bossIntro.doorOpen')
     assert page.evaluate('__game.enemies.find(e=>e.type==="boss").entry.visible')
     page.screenshot(path=str(OUT / 'boss-unload.png'))
@@ -247,7 +280,7 @@ with sync_playwright() as playwright:
     expect(page.get_by_role('heading', name='밤은, 아직 길다.')).to_be_visible()
     page.screenshot(path=str(OUT / 'death.png'))
     page.locator('#ending-screen [data-action=retry]').click()
-    assert page.evaluate('__game.player.hp') == 100
+    assert page.evaluate('__game.player.hp') == 50
     assert page.evaluate('__game.mode') == 'playing'
     assert page.evaluate('__game.audio.context.state') == 'running'
     assert page.evaluate('__game.audio.musicVolume') == 0.2

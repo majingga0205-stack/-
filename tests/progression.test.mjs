@@ -14,7 +14,7 @@ function game(seed = 314, storage = memory()) {
 }
 function arena(seed = 314) {
   const g = game(seed);
-  g.room.covers = []; g.room.platforms = []; g.enemies = []; g.pickups = [];
+  g.room.covers = []; g.room.platforms = []; g.room.hazards = []; g.arrivals = []; g.enemies = []; g.pickups = [];
   g.updateRoomProgress = () => {};
   return g;
 }
@@ -119,7 +119,7 @@ test('death and retry discard run state while persisting only settings and recor
   const oldEnemyIds = new Set(g.enemies.map(e => e.id));
   g.startRun(20);
   assert.equal(g.mode, 'playing'); assert.equal(g.score, 0); assert.equal(g.kills, 0); assert.equal(g.time, 0);
-  assert.deepEqual(g.player.upgrades, {}); assert.equal(g.player.hp, 100); assert.equal(g.player.maxHp, 100);
+  assert.deepEqual(g.player.upgrades, {}); assert.equal(g.player.hp, 50); assert.equal(g.player.maxHp, 50);
   assert.equal(g.player.weapons.length, 1); assert.equal(g.getWeapon().id, 'pistol'); assert.equal(g.getWeapon().reload, 0);
   assert.equal(g.player.rollTime, 0); assert.equal(g.player.rollCooldown, 0); assert.equal(g.hitStop, 0);
   assert.equal(g.bullets.length, 0); assert.equal(g.particles.length, 0); assert.equal(g.rewardChoices.length, 0);
@@ -146,7 +146,7 @@ test('piercing hits each target only once and never passes intact cover', () => 
   g.room.covers = [{ x: 330, y: 550, w: 25, h: 90, hp: 100, maxHp: 100, destructible: false }];
   g.player.aim = 0; g.fire();
   for (let i = 0; i < 40; i++) g.updateBullets(STEP);
-  assert.equal(first.hp, 978); assert.equal(second.hp, 978); assert.equal(behindWall.hp, 1000);
+  assert.equal(first.hp, 1000 - WEAPONS.pistol.damage); assert.equal(second.hp, 1000 - WEAPONS.pistol.damage); assert.equal(behindWall.hp, 1000);
   assert.equal(g.stats.hits, 2); assert.equal(g.bullets.length, 0); assert.equal(g.room.covers[0].hp, 100);
 });
 
@@ -213,22 +213,22 @@ test('capped upgrades are excluded from three-choice room rewards', () => {
 
 test('dodgeShot strengthens exactly the next shot and expires after its window', () => {
   const g = arena(); g.player.upgrades.dodgeShot = 2;
-  g.roll(); advance(g, 0.3); g.fire(); near(g.bullets.at(-1).damage, 22 * 1.9);
-  g.getWeapon().cooldown = 0; g.fire(); near(g.bullets.at(-1).damage, 22);
+  g.roll(); advance(g, 0.3); g.fire(); near(g.bullets.at(-1).damage, WEAPONS.pistol.damage * 1.9);
+  g.getWeapon().cooldown = 0; g.fire(); near(g.bullets.at(-1).damage, WEAPONS.pistol.damage);
   g.player.rollCooldown = 0; g.roll(); advance(g, 1.6); g.getWeapon().cooldown = 0;
-  g.fire(); near(g.bullets.at(-1).damage, 22);
+  g.fire(); near(g.bullets.at(-1).damage, WEAPONS.pistol.damage);
 });
 
 test('lastRound and heavyRounds combine on the final cartridge', () => {
   const g = arena(); g.player.upgrades.lastRound = 2; g.player.upgrades.heavyRounds = 3;
-  g.getWeapon().ammo = 2; g.fire(); near(g.bullets.at(-1).damage, 22 * 1.45);
-  g.getWeapon().cooldown = 0; g.fire(); near(g.bullets.at(-1).damage, 22 * 2.35);
+  g.getWeapon().ammo = 2; g.fire(); near(g.bullets.at(-1).damage, WEAPONS.pistol.damage * 1.45);
+  g.getWeapon().cooldown = 0; g.fire(); near(g.bullets.at(-1).damage, WEAPONS.pistol.damage * 2.35);
 });
 
 test('quickReload reduces reload duration during a kill window and returns to normal afterwards', () => {
   const g = arena(); g.player.upgrades.quickReload = 2;
-  g.damageEnemy(target(g, 800, 1), 1); g.getWeapon().ammo = 1; g.reload(); near(g.getWeapon().reloadTotal, 1.05 * 0.6);
-  advance(g, 4.5); g.getWeapon().ammo = 1; g.reload(); near(g.getWeapon().reloadTotal, 1.05);
+  g.damageEnemy(target(g, 800, 1), 1); g.getWeapon().ammo = 1; g.reload(); near(g.getWeapon().reloadTotal, WEAPONS.pistol.reload * 0.6);
+  advance(g, 4.5); g.getWeapon().ammo = 1; g.reload(); near(g.getWeapon().reloadTotal, WEAPONS.pistol.reload);
 });
 
 test('slowFocus reduces the same seeded angular spread only during slow motion', () => {
@@ -247,7 +247,7 @@ test('swapFrenzy speeds firing for two seconds after a real weapon switch', () =
 });
 
 test('closeRange boosts nearby damage and leaves distant targets unchanged', () => {
-  for (const [x, damage] of [[350, 33], [700, 22]]) {
+  for (const [x, damage] of [[350, WEAPONS.pistol.damage * 1.5], [700, WEAPONS.pistol.damage]]) {
     const g = arena(); g.player.upgrades.closeRange = 2; g.rng = () => 0.5; const enemy = target(g, x);
     g.player.aim = 0; g.fire(); for (let i = 0; i < 80; i++) g.updateBullets(STEP);
     near(1000 - enemy.hp, damage);
@@ -261,14 +261,14 @@ test('shotgun pellets lose damage over distance while the other guns retain it',
     g.fire(); for (let i = 0; i < 100; i++) g.updateBullets(STEP);
     return 1000 - enemy.hp;
   };
-  near(damageAt('shotgun', 110), 18 * 7);
+  near(damageAt('shotgun', 110), WEAPONS.shotgun.damage * WEAPONS.shotgun.pellets);
   assert.ok(damageAt('shotgun', 600) < damageAt('shotgun', 110) * 0.6);
   near(damageAt('pistol', 110), damageAt('pistol', 600));
 });
 
 test('vitality adds and heals 25 per award without duplicate application', () => {
   const g = arena(); g.player.hp = 20; const upgrade = UPGRADES.find(u => u.id === 'vitality');
-  for (let level = 1; level <= 3; level++) { grant(g, upgrade); assert.equal(g.player.maxHp, 100 + level * 25); assert.equal(g.player.hp, 20 + level * 25); }
+  for (let level = 1; level <= 3; level++) { grant(g, upgrade); assert.equal(g.player.maxHp, 50 + level * 25); assert.equal(g.player.hp, 20 + level * 25); }
 });
 
 test('extendedMag rounds each base magazine upward and applies to subsequent reloads', () => {
@@ -280,10 +280,10 @@ test('extendedMag rounds each base magazine upward and applies to subsequent rel
 
 test('slowHarvest and bloodHeal restore their per-kill values without exceeding capacity', () => {
   const g = arena(); g.player.upgrades.slowHarvest = 2; g.player.upgrades.bloodHeal = 3;
-  g.player.slow = 20; g.player.hp = 50; g.damageEnemy(target(g, 800, 1), 1);
-  assert.equal(g.player.slow, 48); assert.equal(g.player.hp, 56);
-  g.player.slow = 98; g.player.hp = 99; g.damageEnemy(target(g, 900, 1), 1);
-  assert.equal(g.player.slow, 100); assert.equal(g.player.hp, 100);
+  g.player.slow = 20; g.player.hp = 20; g.damageEnemy(target(g, 800, 1), 1);
+  assert.equal(g.player.slow, 48); assert.equal(g.player.hp, 26);
+  g.player.slow = 98; g.player.hp = 49; g.damageEnemy(target(g, 900, 1), 1);
+  assert.equal(g.player.slow, 100); assert.equal(g.player.hp, 50);
 });
 
 test('secondWind extends finite slow motion with the advertised drain reduction', () => {
@@ -315,7 +315,7 @@ test('rusher charge damages at most once even if invulnerability expires during 
   const e = g.spawnEnemy({ type: 'rusher', x: 900, y: GROUND }, 0);
   e.state = 'attack'; e.timer = 0.36; e.chargeDir = 1;
   for (let i = 0; i < 20; i++) { e.x = g.player.x; g.player.invuln = 0; g.updateEnemy(e, STEP); }
-  assert.equal(g.player.hp, 100 - ENEMY_TYPES.rusher.damage);
+  assert.equal(g.player.hp, 50 - ENEMY_TYPES.rusher.damage);
 });
 
 for (const phase of [1, 2]) {

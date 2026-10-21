@@ -7,6 +7,7 @@ import { Script } from 'node:vm';
 const root = new URL('../', import.meta.url);
 const modules = [
   ['data.js', ['WEAPONS', 'UPGRADES', 'ZONES', 'ENEMY_TYPES', 'generateRoom']],
+  ['motion.js', ['PLAYER_HEADS', 'getPlayerPose']],
   ['audio.js', ['AudioEngine']],
   ['scenery.js', ['drawScene', 'drawWeather', 'drawArrivals']],
   ['render.js', ['Renderer']],

@@ -6,7 +6,7 @@ import { WEAPONS } from '../src/data.js';
 function arena(seed = 123) {
   const g = new Game({ storage: { getItem() { return null; }, setItem() {} } });
   g.startRun(seed);
-  g.room.covers = []; g.room.platforms = []; g.enemies = []; g.pickups = [];
+  g.room.covers = []; g.room.platforms = []; g.room.hazards = []; g.arrivals = []; g.enemies = []; g.pickups = [];
   g.updateRoomProgress = () => {}; g.player.invuln = 0;
   return g;
 }
@@ -26,12 +26,12 @@ test('crouching reduces the actual hitbox and permits high incoming shots to pas
   const g = arena();
   g.input.keys.add('KeyC'); advance(g, 0.05);
   assert.equal(g.player.h, 34);
-  g.bullets = [incoming(g, GROUND - 45)]; g.updateBullets(0.2);
-  assert.equal(g.player.hp, 100, 'a shot above the crouched head must miss');
+  g.bullets = [incoming(g, GROUND - 40)]; g.updateBullets(0.2);
+  assert.equal(g.player.hp, 50, 'a shot above the crouched head must miss');
   g.input.keys.delete('KeyC'); advance(g, 0.05);
   assert.equal(g.player.h, 58);
-  g.bullets = [incoming(g, GROUND - 45)]; g.updateBullets(0.2);
-  assert.equal(g.player.hp, 90, 'the same shot hits the standing body');
+  g.bullets = [incoming(g, GROUND - 40)]; g.updateBullets(0.2);
+  assert.equal(g.player.hp, 40, 'the same shot hits the standing body');
 });
 
 test('crouch movement is slower and the muzzle follows the lower body', () => {
@@ -78,7 +78,7 @@ test('pause freezes an in-progress vault and its cooldown', () => {
 });
 
 test('all weapons lose durability once per discharge, including a seven-pellet shotgun', () => {
-  const expected = { pistol: 0.22, revolver: 0.55, smg: 0.09, shotgun: 0.65 };
+  const expected = { pistol: 0.7, revolver: 1.6, smg: 0.28, shotgun: 1.9 };
   for (const [id, wear] of Object.entries(expected)) {
     const g = arena(); g.player.weapons = [g.createWeapon(id)];
     const weapon = g.getWeapon();
@@ -102,7 +102,7 @@ test('an exhausted weapon jams without consuming ammunition, and five taps resto
   }
   g.clearJam();
   assert.equal(weapon.jammed, false); assert.equal(weapon.clearProgress, 0);
-  assert.equal(weapon.wetness, 30); assert.ok(weapon.durability >= 35);
+  assert.equal(weapon.wetness, 100); assert.equal(weapon.jamGrace, 5); assert.ok(weapon.durability >= 35);
   weapon.cooldown = 0;
   assert.equal(g.fire(), true);
 });
@@ -120,7 +120,7 @@ test('a healthy weapon can be maintained by holding R, while firing is blocked',
   const frozen = JSON.stringify([weapon.durability, weapon.wetness, weapon.maintenance]);
   advance(g, 2); assert.equal(JSON.stringify([weapon.durability, weapon.wetness, weapon.maintenance]), frozen);
   g.resume(); g.input.keys.add('KeyR'); advance(g, 1.7);
-  assert.equal(weapon.durability, 100); assert.ok(weapon.wetness <= 15);
+  assert.equal(weapon.durability, 100); assert.equal(weapon.wetness, 0);
 });
 
 test('weapon condition and jam progress reset on a new run', () => {
@@ -157,20 +157,23 @@ test('prolonged exposed rain jams the active weapon while a holstered gun stays 
   assert.equal(g.player.weapons[1].wetness, 0); assert.equal(g.player.weapons[1].jammed, false);
 });
 
-test('a roof protects only the space below it, and indoor rooms dry wet weapons', () => {
+test('old roofs no longer block rain and wetness persists indoors, holstered and after rain', () => {
   const g = arena(); g.player.x = 700; g.room.weatherAllowed = true;
+  // Even stale roof metadata cannot grant the removed shelter benefit.
   g.room.shelters = [{ x: 650, y: 430, w: 150, h: 12 }];
   Object.assign(g.weather, { intensity: 1, target: 1, timer: 100 });
   g.getWeapon().wetness = 50;
-  g.updateWeather(0.1); assert.equal(g.player.sheltered, true);
-  g.updateWeaponCondition(1); assert.ok(g.getWeapon().wetness < 50);
-  g.player.y = 400; g.updateWeather(0.1); assert.equal(g.player.sheltered, false);
-  const beforeRain = g.getWeapon().wetness;
-  g.updateWeaponCondition(1); assert.ok(g.getWeapon().wetness > beforeRain);
+  g.updateWeather(0.1); assert.equal(g.player.sheltered, false);
+  g.updateWeaponCondition(1); assert.equal(g.getWeapon().wetness, 57);
   g.room.weatherAllowed = false; g.updateWeather(0.1);
-  assert.equal(g.weather.intensity, 0); assert.equal(g.player.sheltered, true);
-  const beforeDry = g.getWeapon().wetness;
-  g.updateWeaponCondition(1); assert.ok(g.getWeapon().wetness < beforeDry);
+  assert.equal(g.weather.intensity, 0);
+  const wet = g.getWeapon();
+  g.updateWeaponCondition(10); assert.equal(wet.wetness, 57, 'indoor air does not reset wetness');
+  g.player.weapons.push(g.createWeapon('smg')); g.switchWeapon();
+  g.updateWeaponCondition(10); assert.equal(wet.wetness, 57, 'holstering is not a drying exploit');
+  g.room.weatherAllowed = true; Object.assign(g.weather, { intensity: 0, target: 0, timer: 100 });
+  g.updateWeather(0.1); g.updateWeaponCondition(10);
+  assert.equal(wet.wetness, 57, 'clear skies do not dry a wet weapon');
 });
 
 test('outdoor weather alternates rain and clear intervals without advancing combat randomness', () => {
@@ -210,7 +213,7 @@ test('the boss arrives in a drifting car, remains protected through entry and pa
   const snapshot = JSON.stringify([g.arrivals, boss.spawnTime, boss.entry]);
   advance(g, 3);
   assert.equal(JSON.stringify([g.arrivals, boss.spawnTime, boss.entry]), snapshot);
-  g.resume(); advance(g, 1.2);
+  g.resume(); advance(g, 2.1);
   assert.ok(g.bossIntro.doorOpen && boss.entry.visible);
   assert.ok(boss.spawnTime > 0, 'the door opens before the boss can attack');
   advance(g, 2.1);

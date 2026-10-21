@@ -1,9 +1,9 @@
 /** The entire arsenal and encounter catalogue is local and deterministic. */
 export const WEAPONS = Object.freeze({
-  pistol: { id: 'pistol', wear: 0.22, name: '밤의 약속', tag: '권총', damage: 22, interval: 0.245, spread: 0.022, pellets: 1, magazine: 12, reload: 1.05, speed: 1450, range: 1550, recoil: 3, color: '#ffd184', description: '12발 · 빠른 재장전 · 흔들림 없는 조준' },
-  revolver: { id: 'revolver', wear: 0.55, name: '여섯 번째 증언', tag: '리볼버', damage: 68, interval: 0.59, spread: 0.014, pellets: 1, magazine: 6, reload: 1.8, speed: 1650, range: 1750, recoil: 7, color: '#ffe1a0', description: '6발 · 묵직한 한 발 · 긴 사거리' },
-  smg: { id: 'smg', wear: 0.09, name: '빗줄기', tag: '기관단총', damage: 14, interval: 0.078, spread: 0.068, pellets: 1, magazine: 30, reload: 1.6, speed: 1320, range: 1200, recoil: 2.3, color: '#ffc76c', description: '30발 · 빠른 연사 · 연속 사격 시 탄 퍼짐 증가' },
-  shotgun: { id: 'shotgun', wear: 0.65, name: '문을 두드리는 자', tag: '산탄총', damage: 18, interval: 0.83, spread: 0.16, pellets: 7, magazine: 5, reload: 1.75, speed: 1200, range: 750, recoil: 9, color: '#ffb97c', description: '5발 · 7개 산탄 · 근거리 제압 / 거리별 피해 감소' },
+  pistol: { id: 'pistol', wear: 0.7, headMultiplier: 2, name: '밤의 약속', tag: '권총', damage: 24, interval: 0.22, spread: 0.022, pellets: 1, magazine: 12, reload: 0.9, speed: 1450, range: 1550, recoil: 3, color: '#ffd184', description: '12발 · 몸통 24 / 머리 48 · 발사 간격 0.22초 · 재장전 0.9초 · 사격당 내구도 −0.7' },
+  revolver: { id: 'revolver', wear: 1.6, headMultiplier: 2, name: '여섯 번째 증언', tag: '리볼버', damage: 58, interval: 0.59, spread: 0.014, pellets: 1, magazine: 6, reload: 1.8, speed: 1650, range: 1750, recoil: 7, color: '#ffe1a0', description: '6발 · 몸통 58 / 머리 116 · 긴 사거리 · 사격당 내구도 −1.6' },
+  smg: { id: 'smg', wear: 0.28, name: '빗줄기', tag: '기관단총', damage: 12, interval: 0.078, spread: 0.068, pellets: 1, magazine: 30, reload: 1.6, speed: 1320, range: 1200, recoil: 2.3, color: '#ffc76c', description: '30발 · 피해 12 · 헤드샷 추가 피해 없음 · 연속 사격 시 탄 퍼짐 증가 · 사격당 내구도 −0.28' },
+  shotgun: { id: 'shotgun', wear: 1.9, name: '문을 두드리는 자', tag: '산탄총', damage: 15, interval: 0.83, spread: 0.16, pellets: 7, magazine: 5, reload: 1.75, speed: 1200, range: 750, recoil: 9, color: '#ffb97c', description: '5발 · 산탄 7개 × 피해 15 · 헤드샷 추가 피해 없음 · 거리에 따라 피해 감소 · 사격당 내구도 −1.9' },
 });
 
 export const UPGRADES = Object.freeze([
@@ -33,7 +33,7 @@ export const ENEMY_TYPES = Object.freeze({
   pistol: { name: '골목 사수', hp: 64, w: 29, h: 54, speed: 76, damage: 10, range: 940, interval: 1.45, windup: 0.56, color: '#df8d7a' },
   smg: { name: '기관단총 사수', hp: 86, w: 31, h: 57, speed: 62, damage: 7, range: 1020, interval: 2.3, windup: 0.7, color: '#d8a86d' },
   shotgun: { name: '산탄총 집행자', hp: 112, w: 34, h: 58, speed: 114, damage: 7, range: 370, interval: 2.0, windup: 0.8, color: '#d27c5c' },
-  rusher: { name: '칼잡이', hp: 58, w: 26, h: 53, speed: 148, damage: 17, range: 420, interval: 1.75, windup: 0.6, color: '#c3c1b3' },
+  rusher: { name: '칼잡이', hp: 58, w: 26, h: 53, speed: 210, damage: 17, range: 420, interval: 1.75, windup: 0.6, color: '#c3c1b3' },
   heavy: { name: '중장갑 경호원', hp: 190, w: 42, h: 67, speed: 42, damage: 19, range: 1150, interval: 2.9, windup: 1.1, color: '#b3a294' },
   boss: { name: '회장 · 백야', hp: 2100, w: 48, h: 78, speed: 102, damage: 12, range: 1500, interval: 2.5, windup: 1.15, color: '#e76660' },
 });
@@ -83,14 +83,34 @@ export function generateRoom(rng, index) {
   // A shared horizontal offset preserves all platform reachability relations.
   const offset = boss ? 0 : Math.floor((rng() - 0.5) * 90);
   const platforms = template.platforms.map(([x, y, w]) => ({ x: x + offset, y, w, h: 17, oneWay: true }));
-  const covers = template.covers.map(([x, w, h], coverIndex) => ({
-    x: x + offset, y: 640 - h, w, h, hp: 95 + zoneIndex * 25, maxHp: 95 + zoneIndex * 25,
-    destructible: coverIndex !== 0 || rng() > 0.6,
-  }));
+  const covers = template.covers.map(([x, w, h], coverIndex) => {
+    const destructible = coverIndex !== 0 || rng() > 0.6;
+    return { x: x + offset, y: 640 - h, w, h, hp: 95 + zoneIndex * 25, maxHp: 95 + zoneIndex * 25,
+      kind: destructible ? 'crate' : 'metal', vaultable: true, destructible };
+  });
+  // The first thin barricade teaches the dedicated hand-plant vault before the
+  // first firefight. Its landing space is clear of the first existing crate.
+  const barricadeHeight = index % 2 ? 72 : 68;
+  covers.push({ kind: 'barricade', x: 390 + offset, y: 640 - barricadeHeight,
+    w: 22, h: barricadeHeight, hp: 999999, maxHp: 999999, destructible: false, vaultable: true });
+  const wire = { kind: 'wire', x: 1730 + offset, y: 578, w: 52, h: 62,
+    hp: 999999, maxHp: 999999, destructible: false, vaultable: false };
+  covers.push(wire);
+  const hazards = [{ kind: 'wire', x: wire.x - 4, y: wire.y - 8, w: wire.w + 8,
+    h: 10, damage: 3, interval: 0.5, attachedTo: 'fence' }];
+  // Short, isolated strips can always be jumped. Keep them away from the start,
+  // exit and obstacle landing zones; an enemy may never arrive on the barbs.
+  const stripOptions = [850, 1030, 1530, 1970, 2470].map(x => x + offset).filter(x =>
+    (!boss || Math.abs(x + 60 - 900) > 220) &&
+    covers.every(c => x + 120 + 56 <= c.x || x - 56 >= c.x + c.w));
+  if (stripOptions.length) hazards.push({ kind: 'wire', x: choose(rng, stripOptions), y: 630,
+    w: 120, h: 10, damage: 3, interval: 0.5, attachedTo: 'ground' });
   const spawnPoints = [];
   // Places a combatant only on a supported surface, away from the entrance,
   // covers, exit, and every other actor. Final room reserves its centre for boss.
-  const blocked = (x, y, w = 46, h = 78) => covers.some(c => x + w / 2 > c.x - 12 && x - w / 2 < c.x + c.w + 12 && y > c.y && y - h < c.y + c.h);
+  const blocked = (x, y, w = 46, h = 78) =>
+    covers.some(c => x + w / 2 > c.x - 12 && x - w / 2 < c.x + c.w + 12 && y > c.y && y - h < c.y + c.h) ||
+    hazards.some(c => x + w / 2 > c.x - 12 && x - w / 2 < c.x + c.w + 12 && y > c.y && y - h < c.y + c.h);
   const candidates = [];
   for (let x = 770; x <= width - 350; x += 145) {
     const px = x + Math.floor((rng() - 0.5) * 42);
@@ -130,12 +150,8 @@ export function generateRoom(rng, index) {
     variant: index, layoutName: template.name,
     landmark: { id: district.id, name: district.name, subtitle: district.subtitle },
     weatherAllowed: district.outdoors,
-    shelters: district.outdoors ? [
-      { x: 80, y: 430, w: 360, h: 12 },
-      { x: 1360 + offset, y: 315, w: 290, h: 12 },
-      { x: 2070 + offset, y: 320, w: 310, h: 12 },
-    ] : [],
-    platforms, covers, exit: { x: width - 135, y: 640 }, spawnPoints,
+    shelters: [],
+    platforms, covers, hazards, exit: { x: width - 135, y: 640 }, spawnPoints,
     weaponDrop: choose(rng, ['revolver', 'smg', 'shotgun', 'pistol']),
     cleared: false, boss,
   };
