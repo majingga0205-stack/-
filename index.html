@@ -56,7 +56,7 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
 .hud-bottom{gap:18px}.ability-panel,.weapon-panel{background:none}
 .location-line{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:7px;font-size:10px;letter-spacing:.25px;color:#d0c9b1}
 #weather-status{border-left:1px solid #54616e;padding-left:9px;color:#8fa9bd;font-size:9px;white-space:nowrap}
-#weather-status.sheltered{color:#a0bb9b}
+#weather-status.raining{color:#a6bacd}
 .area-panel>#room-progress{margin-top:5px;color:#909eac;font-size:9px;letter-spacing:.4px}
 .movement-controls{display:flex;gap:16px;margin-top:5px;color:#8e9aab;font-size:9px;white-space:nowrap}
 .movement-controls kbd{font-size:8px;padding:1px 4px;color:#bdc8ce;background:#111b27;border-color:#4b5867}
@@ -78,6 +78,10 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
 @media(max-width:1100px){.location-line{font-size:9px;margin-top:5px;gap:6px}#weather-status{font-size:8px;padding-left:6px}.area-panel>#room-progress{font-size:8px}.condition-panel{width:220px;padding:5px 7px}.condition-meters{gap:10px}.condition-label{font-size:8px}.condition-label strong{font-size:9px}.condition-status,.movement-controls{font-size:8px}.movement-controls{gap:10px}.room-notice{font-size:9px}}
 @media(max-width:800px){.hud-bottom{gap:9px}.condition-panel{max-width:29%;padding:4px 6px}.condition-meters{gap:8px}.condition-label{font-size:7px}.condition-label strong{font-size:8px}.condition-status{font-size:7px;white-space:normal;line-height:1.45;margin-top:4px}.movement-controls{font-size:7px;gap:7px;margin-top:4px}.movement-controls kbd{font-size:6px;padding:1px 3px}.location-line{flex-direction:column;gap:4px;font-size:8px;margin-top:5px}#weather-status{border-left:0;padding-left:0;font-size:7px}.area-panel>#room-progress{font-size:7px}.room-notice{bottom:14%;font-size:8px;max-width:58%}.story-caption{top:26%}.quick-keys{gap:7px;font-size:7px}}
 @media(max-width:560px){.condition-meters{gap:5px}.condition-label{font-size:6px;gap:3px}.condition-label strong{font-size:7px}.condition-status{font-size:6px}.movement-controls{font-size:6px;gap:4px}.movement-controls kbd{font-size:5px;padding:1px 2px}.condition-panel{padding:4px}.area-panel{width:43%}.location-line{font-size:7px}.room-notice{font-size:7px}.control-keys kbd{font-size:6px}}
+
+/* Hazard and inspection hints share the existing compact HUD. */
+.movement-controls .blocked{color:#cf8d74}.movement-controls .blocked kbd{border-color:#8f5a48;color:#d8a38a}
+.control-tip p{margin:0 0 12px}.control-tip p:last-child{margin-bottom:0}
 
 </style>
 </head>
@@ -118,7 +122,7 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
 
         <div id="game-hud" class="game-hud ui-layer" hidden>
           <div class="hud-top">
-            <div class="health-panel"><div class="hud-label"><span>해결사</span><span id="health-number">100 / 100</span></div><div class="health-track"><div id="health-fill"></div></div><span id="health-alert" class="health-alert"></span></div>
+            <div class="health-panel"><div class="hud-label"><span>해결사</span><span id="health-number">50 / 50</span></div><div class="health-track"><div id="health-fill"></div></div><span id="health-alert" class="health-alert"></span></div>
             <div class="area-panel"><div id="area-name">01 / 뒷골목</div><div class="location-line"><span id="room-landmark">비 냄새가 나는 골목</span><span id="weather-status">흐림</span></div><span id="room-progress">첫 번째 밤</span></div>
             <div class="run-panel"><span id="run-time">00:00</span><button class="hud-button" data-action="pause" aria-label="일시정지">Ⅱ <kbd>Esc</kbd></button></div>
           </div>
@@ -133,7 +137,7 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
               <div class="movement-controls"><span id="crouch-control"><kbd>C</kbd> <span id="crouch-status">웅크리기</span></span><span id="vault-control"><kbd>F</kbd> <span id="vault-status">담 넘기</span></span></div>
             </div>
             <div id="condition-panel" class="condition-panel" aria-label="총기 상태">
-              <div class="condition-meters"><div title="사격할 때 마모됩니다. 내구도 0%에서 고장납니다."><div class="condition-label"><span>내구도</span><strong id="durability-number">100%</strong></div><div class="condition-track"><div id="durability-fill"></div></div></div><div title="비에 젖음 85%에서 고장납니다. 지붕 아래에서 건조합니다."><div class="condition-label"><span>젖음</span><strong id="wetness-number">0%</strong></div><div class="condition-track wetness-track"><div id="wetness-fill"></div></div></div></div>
+              <div class="condition-meters"><div title="사격할 때 마모됩니다. 내구도 0%에서 고장납니다."><div class="condition-label"><span>내구도</span><strong id="durability-number">100%</strong></div><div class="condition-track"><div id="durability-fill"></div></div></div><div title="젖음 85%에서 고장납니다. R을 길게 눌러 점검해야 젖음이 0%가 됩니다."><div class="condition-label"><span>젖음</span><strong id="wetness-number">0%</strong></div><div class="condition-track wetness-track"><div id="wetness-fill"></div></div></div></div>
               <div id="service-track" class="service-track" hidden><div id="service-fill"></div></div>
               <div id="condition-status" class="condition-status">총기 상태 양호</div>
             </div>
@@ -157,7 +161,7 @@ h1,h2{text-shadow:4px 4px 0 #0b111d}h1 em{color:#d6ccb1}
           <div class="panel-dialog" role="dialog" aria-modal="true" aria-labelledby="panel-title"><div class="panel-header"><div><div id="panel-overline" class="overline">FIELD NOTES</div><h2 id="panel-title">조작 안내</h2></div><button class="close-button" data-action="close" aria-label="닫기">×</button></div><div id="panel-body" class="panel-body"></div><div class="panel-footer"><span id="panel-footer-note">PC · 키보드와 마우스</span><button class="text-button" data-action="close">닫기 <kbd>Esc</kbd></button></div></div>
         </section>
       </div>
-      <div class="below-stage"><div class="session-label"><span class="live-dot"></span> <span id="session-status">새로운 밤이 당신을 기다립니다</span></div><div class="quick-keys"><span><kbd>A</kbd><kbd>D</kbd> 이동</span><span><kbd>Space</kbd> 점프</span><span><kbd>C</kbd> 웅크리기</span><span><kbd>F</kbd> 담 넘기</span><span><kbd>R</kbd> 재장전 · 정비</span></div><span class="build-label">NO WAY BACK. ONLY FORWARD.</span></div>
+      <div class="below-stage"><div class="session-label"><span class="live-dot"></span> <span id="session-status">새로운 밤이 당신을 기다립니다</span></div><div class="quick-keys"><span><kbd>A</kbd><kbd>D</kbd> 이동</span><span><kbd>Space</kbd> 점프</span><span><kbd>C</kbd> 웅크리기</span><span><kbd>F</kbd> 담 넘기</span><span><kbd>R</kbd> 재장전 · 점검</span></div><span class="build-label">NO WAY BACK. ONLY FORWARD.</span></div>
     </main>
     <footer class="site-footer"><span>새벽 전 마지막 탄환 <span class="footer-slash">/</span> LAST BULLET BEFORE DAWN</span><span>세 개의 구역. 하나의 진실.</span></footer>
   </div>
@@ -169,10 +173,10 @@ const __modules = Object.create(null);
 __modules["./data.js"] = (() => {
 /** The entire arsenal and encounter catalogue is local and deterministic. */
 const WEAPONS = Object.freeze({
-  pistol: { id: 'pistol', wear: 0.22, name: '밤의 약속', tag: '권총', damage: 22, interval: 0.245, spread: 0.022, pellets: 1, magazine: 12, reload: 1.05, speed: 1450, range: 1550, recoil: 3, color: '#ffd184', description: '12발 · 빠른 재장전 · 흔들림 없는 조준' },
-  revolver: { id: 'revolver', wear: 0.55, name: '여섯 번째 증언', tag: '리볼버', damage: 68, interval: 0.59, spread: 0.014, pellets: 1, magazine: 6, reload: 1.8, speed: 1650, range: 1750, recoil: 7, color: '#ffe1a0', description: '6발 · 묵직한 한 발 · 긴 사거리' },
-  smg: { id: 'smg', wear: 0.09, name: '빗줄기', tag: '기관단총', damage: 14, interval: 0.078, spread: 0.068, pellets: 1, magazine: 30, reload: 1.6, speed: 1320, range: 1200, recoil: 2.3, color: '#ffc76c', description: '30발 · 빠른 연사 · 연속 사격 시 탄 퍼짐 증가' },
-  shotgun: { id: 'shotgun', wear: 0.65, name: '문을 두드리는 자', tag: '산탄총', damage: 18, interval: 0.83, spread: 0.16, pellets: 7, magazine: 5, reload: 1.75, speed: 1200, range: 750, recoil: 9, color: '#ffb97c', description: '5발 · 7개 산탄 · 근거리 제압 / 거리별 피해 감소' },
+  pistol: { id: 'pistol', wear: 0.7, headMultiplier: 2, name: '밤의 약속', tag: '권총', damage: 24, interval: 0.22, spread: 0.022, pellets: 1, magazine: 12, reload: 0.9, speed: 1450, range: 1550, recoil: 3, color: '#ffd184', description: '12발 · 몸통 24 / 머리 48 · 발사 간격 0.22초 · 재장전 0.9초 · 사격당 내구도 −0.7' },
+  revolver: { id: 'revolver', wear: 1.6, headMultiplier: 2, name: '여섯 번째 증언', tag: '리볼버', damage: 58, interval: 0.59, spread: 0.014, pellets: 1, magazine: 6, reload: 1.8, speed: 1650, range: 1750, recoil: 7, color: '#ffe1a0', description: '6발 · 몸통 58 / 머리 116 · 긴 사거리 · 사격당 내구도 −1.6' },
+  smg: { id: 'smg', wear: 0.28, name: '빗줄기', tag: '기관단총', damage: 12, interval: 0.078, spread: 0.068, pellets: 1, magazine: 30, reload: 1.6, speed: 1320, range: 1200, recoil: 2.3, color: '#ffc76c', description: '30발 · 피해 12 · 헤드샷 추가 피해 없음 · 연속 사격 시 탄 퍼짐 증가 · 사격당 내구도 −0.28' },
+  shotgun: { id: 'shotgun', wear: 1.9, name: '문을 두드리는 자', tag: '산탄총', damage: 15, interval: 0.83, spread: 0.16, pellets: 7, magazine: 5, reload: 1.75, speed: 1200, range: 750, recoil: 9, color: '#ffb97c', description: '5발 · 산탄 7개 × 피해 15 · 헤드샷 추가 피해 없음 · 거리에 따라 피해 감소 · 사격당 내구도 −1.9' },
 });
 
 const UPGRADES = Object.freeze([
@@ -202,7 +206,7 @@ const ENEMY_TYPES = Object.freeze({
   pistol: { name: '골목 사수', hp: 64, w: 29, h: 54, speed: 76, damage: 10, range: 940, interval: 1.45, windup: 0.56, color: '#df8d7a' },
   smg: { name: '기관단총 사수', hp: 86, w: 31, h: 57, speed: 62, damage: 7, range: 1020, interval: 2.3, windup: 0.7, color: '#d8a86d' },
   shotgun: { name: '산탄총 집행자', hp: 112, w: 34, h: 58, speed: 114, damage: 7, range: 370, interval: 2.0, windup: 0.8, color: '#d27c5c' },
-  rusher: { name: '칼잡이', hp: 58, w: 26, h: 53, speed: 148, damage: 17, range: 420, interval: 1.75, windup: 0.6, color: '#c3c1b3' },
+  rusher: { name: '칼잡이', hp: 58, w: 26, h: 53, speed: 210, damage: 17, range: 420, interval: 1.75, windup: 0.6, color: '#c3c1b3' },
   heavy: { name: '중장갑 경호원', hp: 190, w: 42, h: 67, speed: 42, damage: 19, range: 1150, interval: 2.9, windup: 1.1, color: '#b3a294' },
   boss: { name: '회장 · 백야', hp: 2100, w: 48, h: 78, speed: 102, damage: 12, range: 1500, interval: 2.5, windup: 1.15, color: '#e76660' },
 });
@@ -252,14 +256,34 @@ function generateRoom(rng, index) {
   // A shared horizontal offset preserves all platform reachability relations.
   const offset = boss ? 0 : Math.floor((rng() - 0.5) * 90);
   const platforms = template.platforms.map(([x, y, w]) => ({ x: x + offset, y, w, h: 17, oneWay: true }));
-  const covers = template.covers.map(([x, w, h], coverIndex) => ({
-    x: x + offset, y: 640 - h, w, h, hp: 95 + zoneIndex * 25, maxHp: 95 + zoneIndex * 25,
-    destructible: coverIndex !== 0 || rng() > 0.6,
-  }));
+  const covers = template.covers.map(([x, w, h], coverIndex) => {
+    const destructible = coverIndex !== 0 || rng() > 0.6;
+    return { x: x + offset, y: 640 - h, w, h, hp: 95 + zoneIndex * 25, maxHp: 95 + zoneIndex * 25,
+      kind: destructible ? 'crate' : 'metal', vaultable: true, destructible };
+  });
+  // The first thin barricade teaches the dedicated hand-plant vault before the
+  // first firefight. Its landing space is clear of the first existing crate.
+  const barricadeHeight = index % 2 ? 72 : 68;
+  covers.push({ kind: 'barricade', x: 390 + offset, y: 640 - barricadeHeight,
+    w: 22, h: barricadeHeight, hp: 999999, maxHp: 999999, destructible: false, vaultable: true });
+  const wire = { kind: 'wire', x: 1730 + offset, y: 578, w: 52, h: 62,
+    hp: 999999, maxHp: 999999, destructible: false, vaultable: false };
+  covers.push(wire);
+  const hazards = [{ kind: 'wire', x: wire.x - 4, y: wire.y - 8, w: wire.w + 8,
+    h: 10, damage: 3, interval: 0.5, attachedTo: 'fence' }];
+  // Short, isolated strips can always be jumped. Keep them away from the start,
+  // exit and obstacle landing zones; an enemy may never arrive on the barbs.
+  const stripOptions = [850, 1030, 1530, 1970, 2470].map(x => x + offset).filter(x =>
+    (!boss || Math.abs(x + 60 - 900) > 220) &&
+    covers.every(c => x + 120 + 56 <= c.x || x - 56 >= c.x + c.w));
+  if (stripOptions.length) hazards.push({ kind: 'wire', x: choose(rng, stripOptions), y: 630,
+    w: 120, h: 10, damage: 3, interval: 0.5, attachedTo: 'ground' });
   const spawnPoints = [];
   // Places a combatant only on a supported surface, away from the entrance,
   // covers, exit, and every other actor. Final room reserves its centre for boss.
-  const blocked = (x, y, w = 46, h = 78) => covers.some(c => x + w / 2 > c.x - 12 && x - w / 2 < c.x + c.w + 12 && y > c.y && y - h < c.y + c.h);
+  const blocked = (x, y, w = 46, h = 78) =>
+    covers.some(c => x + w / 2 > c.x - 12 && x - w / 2 < c.x + c.w + 12 && y > c.y && y - h < c.y + c.h) ||
+    hazards.some(c => x + w / 2 > c.x - 12 && x - w / 2 < c.x + c.w + 12 && y > c.y && y - h < c.y + c.h);
   const candidates = [];
   for (let x = 770; x <= width - 350; x += 145) {
     const px = x + Math.floor((rng() - 0.5) * 42);
@@ -299,18 +323,46 @@ function generateRoom(rng, index) {
     variant: index, layoutName: template.name,
     landmark: { id: district.id, name: district.name, subtitle: district.subtitle },
     weatherAllowed: district.outdoors,
-    shelters: district.outdoors ? [
-      { x: 80, y: 430, w: 360, h: 12 },
-      { x: 1360 + offset, y: 315, w: 290, h: 12 },
-      { x: 2070 + offset, y: 320, w: 310, h: 12 },
-    ] : [],
-    platforms, covers, exit: { x: width - 135, y: 640 }, spawnPoints,
+    shelters: [],
+    platforms, covers, hazards, exit: { x: width - 135, y: 640 }, spawnPoints,
     weaponDrop: choose(rng, ['revolver', 'smg', 'shotgun', 'pistol']),
     cleared: false, boss,
   };
 }
 
 return { WEAPONS, UPGRADES, ZONES, ENEMY_TYPES, generateRoom };
+})();
+// motion.js
+__modules["./motion.js"] = (() => {
+// Shared pose selection keeps the authored 64px sprite and bullet anatomy in
+// agreement. Coordinates are local sprite pixels (origin at its top-left).
+const PLAYER_HEADS = Object.freeze({
+  stand: [33, 13], crouch: [38, 36], jumpRise: [36, 12], jumpFall: [32, 13],
+  land: [36, 20], vaultPlant: [40, 15], vaultTuck: [43, 22],
+  vaultClear: [37, 14], barrierPlant: [40, 18], barrierClear: [37, 26],
+  barrierLand: [38, 19], dash: [44, 20],
+  roll: [[41, 32], [43, 47], [23, 49], [31, 29]],
+});
+
+function getPlayerPose(p) {
+  const moving = Math.abs(p.vx || 0) > 15 && p.grounded;
+  let frame = moving ? Math.floor((p.animation || 0) / 1.15) % 4 : 0;
+  let pose = p.crouching ? 'crouch' : !p.grounded ? (p.vy < -60 ? 'jumpRise' : 'jumpFall') : p.landingTime > 0 ? 'land' : 'stand';
+  let dir = Math.cos(p.aim || 0) >= 0 ? 1 : -1, vaultProgress = 0;
+  if (p.vaultTime > 0 && p.vault) {
+    vaultProgress = Math.max(0, Math.min(1, p.vault.elapsed / p.vault.duration));
+    dir = p.vault.dir || Math.sign(p.vault.endX - p.vault.startX) || dir;
+    const thin = p.vault.kind === 'barricade';
+    pose = vaultProgress < .16 ? 'stand' : vaultProgress < .24 ? 'jumpRise' : vaultProgress < .33 ? (thin ? 'barrierPlant' : 'vaultPlant') : vaultProgress < .78 ? (thin ? 'barrierClear' : 'vaultTuck') : vaultProgress < .90 ? 'vaultClear' : (thin ? 'barrierLand' : 'land');
+    frame = Math.min(3, Math.floor(vaultProgress * 4));
+  } else if (p.rollTime > 0) {
+    pose = 'roll'; dir = p.rollDir || dir;
+    frame = Math.min(3, Math.floor((1 - p.rollTime / (p.rollTotal || .28)) * 4));
+  }
+  return { pose, frame, dir, vaultProgress };
+}
+
+return { PLAYER_HEADS, getPlayerPose };
 })();
 // audio.js
 __modules["./audio.js"] = (() => {
@@ -864,7 +916,7 @@ function station(ctx, camera, variant, time) {
       rect(ctx, x + 150, 112, 230, 8, '#212c34');
       for (let cable = 0; cable < 4; cable++) rect(ctx, x, 242 + cable * 14, 380, 3, '#303b41');
     }
-    for (let i = 0; i < 5; i++) trainCar(ctx, i * 660 + 60 - shift, 605, 620, false, i % 3 === 0);
+    for (let i = 0; i < 5; i++) { ctx.save(); ctx.translate(i * 540 + 60 - shift, 550); ctx.scale(.7, .7); trainCar(ctx, 0, 0, 620, false, true); ctx.restore(); }
     const signal = 1050 - camera * .85;
     rect(ctx, signal, 268, 8, 372, '#28313a'); rect(ctx, signal - 14, 258, 36, 78, '#070c11');
     rect(ctx, signal - 4, 270, 16, 16, '#ba5546'); rect(ctx, signal - 4, 300, 16, 16, '#292b28');
@@ -1000,17 +1052,6 @@ function floor(ctx, room, camera, variant, wet) {
   rect(ctx, 0, 714, W, 6, '#080d14');
 }
 
-function shelter(ctx, cover, camera) {
-  const x = cover.x - camera, y = cover.y, w = cover.w, h = cover.h || 12;
-  rect(ctx, x - 4, y - 8, w + 8, h + 8, '#0a121b');
-  for (let stripe = 0; stripe < w / 20; stripe++) rect(ctx, x + stripe * 20, y - 4, Math.min(20, w - stripe * 20), h + 4, stripe % 2 ? '#324247' : '#493c36');
-  rect(ctx, x - 4, y + h, w + 8, 4, '#697169');
-  rect(ctx, x + 5, y + h + 4, 4, FLOOR - y - h - 4, '#1d2c34');
-  rect(ctx, x + w - 9, y + h + 4, 4, FLOOR - y - h - 4, '#1d2c34');
-  rect(ctx, x + 12, y - 27, 88, 17, '#111d24');
-  text(ctx, '비 가림', x + 56, y - 18, '#8eada5', 11, 'center');
-}
-
 function drawScene(ctx, game, camera = 0, time = 0) {
   const room = game.room || {}, variant = Math.max(0, Math.min(8, room.variant ?? room.index ?? 0));
   ctx.save(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -1024,7 +1065,6 @@ function drawScene(ctx, game, camera = 0, time = 0) {
     const first = Math.floor(camera / 760);
     for (let i = first; i < first + 3; i++) lamp(ctx, 290 + i * 760 - camera, variant >= 6 ? 340 : 314, variant >= 6 ? 300 : 326);
   }
-  for (const canopy of room.shelters || []) shelter(ctx, canopy, camera);
   // Route plaques are part of the environment and change in every room.
   const plaqueX = 72 - camera * .76;
   if (plaqueX > -390) {
@@ -1040,15 +1080,12 @@ function drawWeather(ctx, game, camera = 0, time = 0) {
   const room = game.room || {};
   const intensity = Math.max(0, Math.min(1, game.weather?.intensity || 0));
   if (room.theme === 'subway' || room.weatherAllowed === false || intensity <= .01) return;
-  const shelters = room.shelters || [];
   ctx.save();
   const count = Math.round(240 * intensity);
   for (let i = 0; i < count; i++) {
     const speed = 430 + fraction(i + 500) * 330;
     const y = (fraction(i + 3) * 760 + time * speed) % 760 - 30;
     const x = ((fraction(i + 30) * 1440 - time * 115 - camera * .12) % 1440 + 1440) % 1440 - 80;
-    const worldX = x + camera;
-    if (shelters.some(s => worldX >= s.x && worldX <= s.x + s.w && y >= s.y)) continue;
     ctx.globalAlpha = (.14 + fraction(i + 12) * .22) * intensity;
     rect(ctx, x, y, 2, 6, '#9daeb8'); rect(ctx, x - 2, y + 6, 2, 6, '#778f9f');
     if (y > 636 && y < 661) {
@@ -1061,7 +1098,7 @@ function drawWeather(ctx, game, camera = 0, time = 0) {
 function car(ctx, x, y, event, boss = false) {
   const dir = event.facing || -1, elapsed = event.elapsed || 0;
   const phase = event.phase || 'approach';
-  const drift = boss && phase === 'approach';
+  const drift = boss && phase === 'approach' && (event.drift || 0) > .03;
   const shake = drift ? Math.sin(elapsed * 22) * 2 : 0;
   ctx.save(); ctx.translate(SNAP(x), SNAP(y)); ctx.scale(dir < 0 ? -1 : 1, 1);
   if (drift) ctx.transform(1, 0, (event.drift || 0) * 2, 1, 0, -Math.abs(event.drift || 0) * 18);
@@ -1097,7 +1134,7 @@ function car(ctx, x, y, event, boss = false) {
   }
   rect(ctx, 105, -45, 10, 10, '#d5c28f'); rect(ctx, -114, -43, 6, 8, '#a84940');
   rect(ctx, 115, -25, 7, 8, '#8b8a7e'); rect(ctx, -120, -25, 8, 8, '#777c73');
-  if (phase === 'approach' || phase === 'unload') {
+  if (phase === 'approach' || phase === 'unload' || phase === 'departureWarning') {
     ctx.save(); ctx.globalAlpha = .055;
     for (let i = 0; i < 10; i++) rect(ctx, 120 + i * 14, -45 - i * 2, 14, 12 + i * 4, '#d4c391');
     ctx.restore();
@@ -1132,17 +1169,82 @@ function trainCar(ctx, x, y, width = 520, doorOpen = false, dark = false) {
   for (const wx of [52, width - 72]) rect(ctx, x + wx, y - 4, 40, 10, '#060b11');
 }
 
-function drawArrivals(ctx, game, camera = 0, time = 0) {
+function rearTrack(ctx, game, camera, time) {
+  const events = (game.arrivals || []).filter(event => event.kind === 'train');
+  if (!events.length) return;
+  const maintenance = game.room.variant === 5;
+  const baseY = maintenance ? 334 : 556;
+  // Separate tracks end well above the playable platform; they are scenery,
+  // never a collision body. Their desaturated windows sit behind the pillars.
   ctx.save();
+  ctx.beginPath(); ctx.rect(camera - 2, maintenance ? 190 : 350, W + 4, maintenance ? 152 : 224); ctx.clip();
+  rect(ctx, camera - 2, maintenance ? 190 : 350, W + 4, maintenance ? 152 : 224, '#090f16');
+  const scale = maintenance ? .53 : .7;
+  for (const event of events) {
+    const x = camera + (event.x - camera) * .82;
+    if (x < camera - 500 || x > camera + W + 500) continue;
+    ctx.save(); ctx.translate(SNAP(x), baseY); ctx.scale(scale, scale);
+    ctx.globalAlpha = .75;
+    trainCar(ctx, -220, 0, 440, event.doorOpen || event.phase === 'unload', true);
+    ctx.restore();
+  }
+  pixelLine(ctx, camera, baseY + 5, camera + W, baseY + 5, '#273641', 3);
+  pixelLine(ctx, camera, baseY + 13, camera + W, baseY + 13, '#1a2630', 2);
+  ctx.restore();
+  // Foreground architecture is re-stamped over rear traffic, so even station
+  // pillars and maintenance pipes unambiguously remain in front of the train.
+  const shift = camera * .62;
+  if (game.room.variant === 3) {
+    for (let i = 0; i < 8; i++) {
+      const x = camera + i * 410 - shift + 40;
+      rect(ctx, x, 118, 24, 522, '#0a1117'); rect(ctx, x + 4, 126, 4, 510, '#364244');
+      rect(ctx, x - 12, 112, 48, 16, '#354042');
+      if (i % 3 !== 0) { rect(ctx, x + 105, 549, 170, 10, '#574a36'); rect(ctx, x + 120, 559, 6, 62, '#1e292f'); rect(ctx, x + 254, 559, 6, 62, '#1e292f'); }
+    }
+  } else if (game.room.variant === 4) {
+    for (let i = -1; i < 8; i++) {
+      const x = camera + i * 380 - shift % 380;
+      rect(ctx, x, 142, 22, 498, '#212c34');
+      for (let cable = 0; cable < 4; cable++) rect(ctx, x, 242 + cable * 14, 380, 3, '#303b41');
+    }
+  } else {
+    for (let row = 0; row < 4; row++) {
+      rect(ctx, camera, 218 + row * 34, W, 20, row % 2 ? '#3d403a' : '#2d373d');
+      rect(ctx, camera, 221 + row * 34, W, 3, '#596052');
+    }
+  }
+  text(ctx, '후방 선로 · 통과 열차', camera + W - 110, maintenance ? 174 : 332, '#73888f', 11, 'center');
+}
+
+function drawArrivals(ctx, game, camera = 0, time = 0, layer = 'front') {
+  if (layer === 'back') { rearTrack(ctx, game, camera, time); return; }
+  ctx.save();
+  const warnedSides = new Set();
   for (const event of game.arrivals || []) {
+    if (event.kind === 'train') continue;
     const x = event.x ?? event.toX ?? 0, y = event.y ?? FLOOR;
+    const vehicle = event.kind === 'car' || event.kind === 'bossCar';
+    const outsideView = x < camera - 80 || x > camera + W + 80;
+    const side = x < camera + W / 2 ? -1 : 1;
+    const headingIntoView = side < 0 ? (event.velocity || 0) > 70 : (event.velocity || 0) < -70;
+    const departingIntoView = event.phase === 'departureWarning' && outsideView && (side < 0 ? event.facing > 0 : event.facing < 0);
+    const movingIntoView = outsideView && headingIntoView && (event.phase === 'approach' || event.phase === 'depart');
+    if (vehicle && (event.phase === 'warning' || departingIntoView || movingIntoView)) {
+      if (!warnedSides.has(side)) {
+        warnedSides.add(side);
+        const markerX = camera + (side > 0 ? W - 170 : 170);
+        rect(ctx, markerX - 147, 502, 294, 32, '#171219');
+        rect(ctx, markerX - 147, 502, 4, 32, '#bd7055');
+        const warning = event.phase === 'departureWarning' ? '차량 출발' : '차량 진입';
+        text(ctx, side > 0 ? `← ${warning} · 점프 / 회피` : `${warning} → · 점프 / 회피`, markerX, 518, '#dfad78', 14, 'center');
+      }
+    }
     if (x < camera - 760 || x > camera + W + 760) continue;
-    if (event.kind === 'car' || event.kind === 'bossCar') {
+    if (vehicle) {
       car(ctx, x, y, event, event.kind === 'bossCar');
-      if (event.kind === 'bossCar' && event.phase === 'approach') text(ctx, '검은 차량 접근 · 회피 공간 확보', x, y - 126, '#d7ad7b', 14, 'center');
-    } else if (event.kind === 'train') {
-      trainCar(ctx, x - 220, y, 440, event.doorOpen || event.phase === 'unload');
-      if (event.phase === 'approach') text(ctx, '회송 열차 진입', x, y - 252, '#cbb680', 12, 'center');
+      if (event.phase === 'departureWarning') text(ctx, '차량 출발 준비 · 점프 / 회피', x, y - 126, '#e7b685', 14, 'center');
+      else if (event.phase === 'approach' && event.kind === 'bossCar') text(ctx, '검은 차량 접근 · 충돌 주의', x, y - 126, '#d7ad7b', 14, 'center');
+      else if (event.phase === 'depart' && (event.speed || 0) > 70) text(ctx, '차량 통과', x, y - 112, '#c99d77', 11, 'center');
     } else if (event.kind === 'door') {
       rect(ctx, x - 37, y - 94, 74, 94, '#050b11');
       rect(ctx, x - 43, y - 100, 86, 6, '#596052');
@@ -1172,6 +1274,7 @@ return { drawScene, drawWeather, drawArrivals };
 // render.js
 __modules["./render.js"] = (() => {
 const { drawScene, drawWeather, drawArrivals } = __modules["./scenery.js"];
+const { PLAYER_HEADS, getPlayerPose } = __modules["./motion.js"];
 const WIDTH = 1280;
 const HEIGHT = 720;
 // A native 64×64 actor occupies 64 world pixels; no detail is downsampled.
@@ -1271,7 +1374,86 @@ function pixelPolygon(ctx, points, color) {
   }
 }
 
+// The detective uses jointed poses instead of a wide chest plate or a rotated
+// standing sprite. Every limb and coat hem is rasterized on the same 64px grid.
+function makePlayer(pose, frame) {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d'), p = ACTOR_COLORS.player;
+  const step = [0, 5, 0, -5][frame % 4];
+  let body = { head:[33,13], angle:0, neck:[32,23], hip:[31,42], knees:[[27+step,51],[35-step,51]], feet:[[24+step,61],[38-step,61]], arm:[[25,27],[22-step*.35,37],[24-step*.5,44]], hem:12 };
+  const poses = {
+    crouch: { head:[38,36],neck:[35,44],hip:[29,51],knees:[[20,55],[42,54]],feet:[[23,62],[43,62]],arm:[[30,45],[25,50],[22,54]],hem:5 },
+    jumpRise: { head:[36,12],angle:.08,neck:[34,23],hip:[30,39],knees:[[20,43],[42,43]],feet:[[17,54],[35,53]],arm:[[27,26],[22,34],[18,38]],hem:12 },
+    jumpFall: { head:[32,13],angle:-.05,neck:[31,23],hip:[30,40],knees:[[24,49],[39,48]],feet:[[23,59],[42,58]],arm:[[25,27],[19,33],[17,39]],hem:13 },
+    land: { head:[36,20],angle:.08,neck:[33,30],hip:[29,44],knees:[[19,53],[43,51]],feet:[[23,62],[45,62]],arm:[[27,32],[23,42],[27,48]],hem:9 },
+    vaultPlant: { head:[40,15],angle:.25,neck:[36,26],hip:[28,41],knees:[[19,48],[42,39]],feet:[[18,61],[48,46]],arm:[[30,28],[36,36],[46,39]],hem:10 },
+    vaultTuck: { head:[43,22],angle:.45,neck:[36,30],hip:[25,41],knees:[[35,41],[44,34]],feet:[[45,46],[56,37]],arm:[[30,31],[23,39],[27,48]],hem:11 },
+    vaultClear: { head:[37,14],angle:.1,neck:[34,25],hip:[30,40],knees:[[40,47],[25,49]],feet:[[51,55],[24,61]],arm:[[28,28],[21,36],[18,42]],hem:11 },
+    barrierPlant: { head:[40,18],angle:.35,neck:[35,29],hip:[24,41],knees:[[35,43],[18,49]],feet:[[48,48],[12,58]],arm:[[30,30],[38,38],[45,43]],hem:9 },
+    barrierClear: { head:[37,26],angle:.65,neck:[30,35],hip:[20,44],knees:[[38,43],[39,36]],feet:[[55,43],[56,34]],arm:[[25,35],[21,43],[27,51]],hem:10 },
+    barrierLand: { head:[38,19],angle:.12,neck:[34,30],hip:[29,44],knees:[[20,53],[41,50]],feet:[[23,62],[48,60]],arm:[[28,32],[24,43],[28,48]],hem:8 },
+    dash: { head:[44,20],angle:.4,neck:[37,30],hip:[24,42],knees:[[14,47],[34,45]],feet:[[9,57],[22,55]],arm:[[30,32],[22,36],[14,36]],hem:11 },
+  };
+  if (poses[pose]) body = {...body, ...poses[pose]};
+  if (pose === 'roll') {
+    const rolls = [
+      {head:[41,32],angle:.7,neck:[35,41],hip:[24,45],knees:[[18,54],[40,50]],feet:[[21,62],[47,59]],arm:[[30,40],[41,46],[46,52]],hem:9},
+      {head:[43,47],angle:1.7,neck:[35,43],hip:[23,35],knees:[[19,27],[32,27]],feet:[[29,24],[43,33]],arm:[[33,43],[39,54],[32,58]],hem:9},
+      {head:[23,49],angle:-1.8,neck:[28,42],hip:[41,38],knees:[[48,46],[40,53]],feet:[[51,57],[31,60]],arm:[[28,43],[19,53],[27,58]],hem:8},
+      {head:[31,29],angle:-.2,neck:[32,39],hip:[33,48],knees:[[21,55],[42,54]],feet:[[22,62],[47,62]],arm:[[28,41],[22,49],[24,55]],hem:7},
+    ];
+    body = {...body, ...rolls[frame % 4]};
+  }
+  body.head = pose === 'roll' ? PLAYER_HEADS.roll[frame % 4] : PLAYER_HEADS[pose] || PLAYER_HEADS.stand;
+  const poly = (points,color) => pixelPolygon(ctx,points,color);
+  const limb = (a,b,width,color) => {
+    const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1,nx=-dy/len*width/2,ny=dx/len*width/2;
+    poly([[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]],color);
+  };
+  const chain = (points,width,color) => { for(let i=1;i<points.length;i++){limb(points[i-1],points[i],width+2,p.ink);limb(points[i-1],points[i],width,color);} };
+  // The planted arm is drawn in world space so its hand can hold the actual
+  // obstacle lip. Keeping it here as well would produce a third arm.
+  if (!pose.endsWith('Plant')) chain(body.arm,4,p.dark);
+  for (let side=0;side<2;side++) {
+    const hip=[body.hip[0]+(side?3:-3),body.hip[1]];
+    chain([hip,body.knees[side],body.feet[side]],side?5:4,side?p.coat:p.dark);
+    pixelLine(ctx,body.knees[side][0],body.knees[side][1],body.feet[side][0],body.feet[side][1]-3,side?p.fold:p.dark);
+    const foot=body.feet[side];ctx.fillStyle=p.ink;ctx.fillRect(Math.round(foot[0]-3),Math.round(foot[1]-1),10,4);
+    ctx.fillStyle=side?p.edge:p.fold;ctx.fillRect(Math.round(foot[0]),Math.round(foot[1]-1),6,1);
+  }
+  const n=body.neck,h=body.hip,dx=h[0]-n[0],dy=h[1]-n[1],len=Math.hypot(dx,dy)||1;
+  const side=[dy/len,-dx/len],down=[dx/len,dy/len];
+  const point=(base,across,along=0)=>[base[0]+side[0]*across+down[0]*along,base[1]+side[1]*across+down[1]*along];
+  const hem=[h[0]+down[0]*body.hem,h[1]+down[1]*body.hem];
+  poly([point(n,-7),point(n,5),point(h,7),point(hem,7),point(hem,2,-3),point(h,0,2),point(hem,-5),point(hem,-9),point(h,-6)],p.ink);
+  poly([point(n,-5,-1),point(n,4),point(h,5),point(hem,5,-2),point(hem,1,-4),point(h,-1,1),point(hem,-5,-2),point(hem,-7,-2),point(h,-4)],p.coat);
+  poly([point(n,-4,2),point(h,-2),point(hem,-5,-3),point(hem,-7,-3)],p.dark);
+  poly([point(n,2,3),point(h,3),point(hem,4,-3),point(h,5,-2)],p.fold);
+  const lapel=point(n,-2,3),lapelEnd=point(n,-3,10);
+  pixelLine(ctx,...point(n,-5),...lapel,p.edge);pixelLine(ctx,...lapel,...lapelEnd,p.fold);
+  pixelLine(ctx,...point(n,1,2),...point(n,1,11),p.accent);
+  pixelLine(ctx,...point(h,4,-2),...point(hem,5,-3),p.edge);
+  ctx.fillStyle=p.metal;const button=point(h,0,-4);ctx.fillRect(Math.round(button[0]),Math.round(button[1]),1,1);
+  // Face and fedora are redrawn at each joint angle, not rotated as a bitmap.
+  const angle=body.angle||0,head=body.head,cos=Math.cos(angle),sin=Math.sin(angle);
+  const hp=(x,y)=>[head[0]+x*cos-y*sin,head[1]+x*sin+y*cos];
+  const face=(pts,color)=>poly(pts.map(([x,y])=>hp(x,y)),color);
+  face([[-4,-4],[4,-4],[5,0],[8,2],[5,3],[4,8],[-3,7],[-6,2]],p.ink);
+  face([[0,-2],[4,-2],[4,1],[7,2],[4,3],[3,6],[-1,6],[-1,1]],p.skin);
+  pixelLine(ctx,...hp(1,0),...hp(5,0),p.dark);pixelLine(ctx,...hp(5,3),...hp(6,3),p.light);
+  face([[-8,-10],[3,-10],[7,-6],[6,-2],[13,0],[13,2],[-12,2],[-12,0],[-7,-2]],p.ink);
+  face([[-6,-8],[2,-8],[5,-5],[5,-2],[-7,-2]],p.coat);
+  pixelLine(ctx,...hp(-6,-7),...hp(2,-7),p.fold);pixelLine(ctx,...hp(-6,-3),...hp(5,-3),p.dark);
+  pixelLine(ctx,...hp(-10,0),...hp(10,0),p.fold);pixelLine(ctx,...hp(-9,0),...hp(-2,0),p.edge);
+  if (pose==='roll' || pose.startsWith('vault') || pose.startsWith('barrier')) {
+    const front = pose==='roll' ? [point(n,4,3),[body.head[0]+2,body.head[1]+6],point(n,0,8)] : [point(n,3,4),point(h,6,-2),point(h,8,5)];
+    chain(front,4,p.coat);const hand=front[2];ctx.fillStyle=p.skin;ctx.fillRect(Math.round(hand[0]-1),Math.round(hand[1]-1),3,3);
+  }
+  return canvas;
+}
+
 function makeActor(type, pose = 'stand', frame = 0) {
+  if (type === 'player') return makePlayer(pose, frame);
   const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
   const ctx = canvas.getContext('2d');
   const p = ACTOR_COLORS[type] || ACTOR_COLORS.pistol;
@@ -1449,7 +1631,7 @@ class Renderer {
     }));
     this.actors = new Map();
     this.guns = new Map();
-    for (const type of Object.keys(ACTOR_COLORS)) for (const pose of ['stand', 'crouch', 'vault']) {
+    for (const type of Object.keys(ACTOR_COLORS)) for (const pose of (type === 'player' ? ['stand','crouch','jumpRise','jumpFall','land','roll','vaultPlant','vaultTuck','vaultClear','barrierPlant','barrierClear','barrierLand'] : ['stand','crouch','vault'])) {
       for (let frame = 0; frame < 4; frame++) this.actors.set(`${type}/${pose}/${frame}`, makeActor(type, pose, frame));
     }
     for (const id of ['pistol', 'revolver', 'smg', 'shotgun', 'heavy', 'boss']) this.guns.set(id, makeGun(id));
@@ -1477,12 +1659,14 @@ class Renderer {
     const camera = Math.round((game.camera?.x || 0) / DOT) * DOT;
     drawScene(ctx, game, camera, this.time);
     ctx.save(); ctx.translate(-camera, 0);
-    drawArrivals(ctx, game, camera, this.time);
+    drawArrivals(ctx, game, camera, this.time, 'back');
     this.drawExit(game);
     for (const platform of game.room.platforms || []) this.drawPlatform(platform);
     for (const cover of game.room.covers || []) {
       if (cover.hp > 0 || !cover.destructible) this.drawCover(cover, game.room.theme);
     }
+    for (const hazard of game.room.hazards || []) this.drawHazard(hazard);
+    drawArrivals(ctx, game, camera, this.time, 'front');
     for (const pickup of game.pickups || []) this.drawPickup(pickup, game.player);
     for (const enemy of game.enemies || []) {
       if (!enemy.dead && enemy.hp > 0) this.drawEnemy(enemy, game);
@@ -1665,6 +1849,32 @@ class Renderer {
 
   drawCover(c, theme) {
     const ctx = this.ctx;
+    if (c.kind === 'barricade') {
+      ctx.save(); ctx.translate(Math.round(c.x), Math.round(c.y));
+      ctx.fillStyle='#070d13';ctx.fillRect(-2,0,c.w+4,c.h);
+      ctx.fillStyle='#495354';ctx.fillRect(1,2,c.w-2,c.h-2);
+      ctx.fillStyle='#81908a';ctx.fillRect(-3,0,c.w+6,3);
+      ctx.fillStyle='#1a272f';ctx.fillRect(4,6,c.w-8,c.h-10);
+      for(let y=10;y<c.h-8;y+=15) {
+        pixelPolygon(ctx,[[3,y],[c.w-3,y+9],[c.w-3,y+14],[3,y+5]],'#b59d64');
+        ctx.fillStyle='#d1be8d';ctx.fillRect(3,y,3,2);
+      }
+      ctx.fillStyle='#333f43';ctx.fillRect(-9,c.h-4,c.w+18,4);
+      ctx.fillStyle='#b1bcb0';ctx.fillRect(3,4,2,2);ctx.fillRect(c.w-5,4,2,2);
+      ctx.restore();return;
+    }
+    if (c.kind === 'wire') {
+      ctx.save();ctx.translate(Math.round(c.x),Math.round(c.y));
+      ctx.fillStyle='#1b282e';ctx.fillRect(0,0,c.w,c.h);
+      for(let i=-c.h;i<c.w;i+=12) {
+        const start=Math.max(0,-i),end=Math.min(c.h,c.w-i);
+        pixelLine(ctx,i+start,start,i+end,end,'#536465');
+        pixelLine(ctx,c.w-i-start,start,c.w-i-end,end,'#354b53');
+      }
+      ctx.fillStyle='#81918a';ctx.fillRect(0,0,3,c.h);ctx.fillRect(c.w-3,0,3,c.h);ctx.fillRect(0,1,c.w,2);
+      ctx.fillStyle='#554039';ctx.fillRect(4,4,9,9);ctx.fillStyle='#b39364';ctx.fillRect(7,5,2,5);ctx.fillRect(7,11,2,1);
+      ctx.restore();label(ctx,'철조망 · 넘기 불가',c.x+c.w/2,c.y-16,10,'#bf9b7d');return;
+    }
     const destructible = c.destructible;
     ctx.save(); ctx.translate(c.x, c.y);
     ctx.fillStyle = '#0006'; ctx.fillRect(5, c.h - 3, c.w + 7, 7);
@@ -1691,6 +1901,19 @@ class Renderer {
       line(ctx, 0, 1, c.w, 1, '#a0aaa4', 3);
       for (let y = 13; y < c.h - 6; y += 14) line(ctx, 10, y, c.w - 10, y, '#23333c', 3);
       ctx.fillStyle = '#b9aa71'; ctx.fillRect(c.w - 14, 8, 5, 4);
+    }
+    ctx.restore();
+  }
+
+  drawHazard(h) {
+    if(h.kind!=='wire') return;
+    const ctx=this.ctx, y=Math.round(h.y+h.h*.6);
+    ctx.save();
+    pixelLine(ctx,h.x,y,h.x+h.w,y,'#89948b',2);
+    pixelLine(ctx,h.x,y+3,h.x+h.w,y+3,'#34474e');
+    for(let x=h.x+5;x<h.x+h.w-4;x+=11) {
+      pixelLine(ctx,x-3,y-4,x+4,y+4,'#a3ada2');pixelLine(ctx,x-3,y+4,x+4,y-4,'#657a7b');
+      ctx.fillStyle='#4c302b';ctx.fillRect(Math.round(x),y-1,2,2);
     }
     ctx.restore();
   }
@@ -1754,34 +1977,41 @@ class Renderer {
   drawPlayer(p, game) {
     const ctx = this.ctx;
     const x = Math.round(p.x), y = Math.round(p.y);
-    const dir = Math.cos(p.aim || 0) >= 0 ? 1 : -1;
-    const moving = Math.abs(p.vx || 0) > 15 && p.grounded;
-    const frame = moving ? Math.floor((p.animation || this.time * 16) / 1.7) % 4 : 0;
-    const pose = p.vaultTime > 0 ? 'vault' : p.crouching || p.rollTime > 0 ? 'crouch' : 'stand';
+    const aimDir = Math.cos(p.aim || 0) >= 0 ? 1 : -1;
+    const { pose, frame, dir, vaultProgress } = getPlayerPose(p);
+    const vaulting = p.vaultTime > 0 && p.vault;
     ctx.save(); ctx.translate(x, y);
     if (p.invuln > 0) ctx.globalAlpha = game.settings?.flash === 0 ? 0.72 : 0.64 + Math.sin(this.time * 48) * 0.15 * (game.settings?.flash ?? 0.5);
-    ctx.fillStyle = '#02040999'; ctx.fillRect(-20, -3, 40, 5); ctx.fillRect(-15, 2, 30, 2);
-    if (p.rollTime > 0) {
-      ctx.translate(0, -19); ctx.rotate(Math.round(p.rollTime * 17 / (Math.PI / 4)) * Math.PI / 4 * (p.rollDir || dir)); ctx.translate(0, 19);
+    ctx.fillStyle = '#02040999'; ctx.fillRect(-17, -2, 34, 4);
+    ctx.save(); ctx.scale(dir, 1); ctx.drawImage(this.actor('player', pose, frame), -32, -64); ctx.restore();
+    const weapon = p.weapons?.[p.weaponIndex], id = weapon?.id || 'pistol';
+    if (vaulting && vaultProgress >= .24 && vaultProgress < .33 && Number.isFinite(p.vault.obstacleX)) {
+      // The support hand stays on the same physical lip while knees lift.
+      const lipX = dir > 0 ? p.vault.obstacleX + 3 : p.vault.obstacleX + p.vault.obstacleW - 3;
+      const lipY = p.vault.obstacleY + 1;
+      const sx = dir * 5, sy = -36, hx = lipX - x, hy = lipY - y;
+      const ex = sx + (hx-sx)*.55 - dir*3, ey = sy + (hy-sy)*.46 + 5;
+      pixelLine(ctx,sx-1,sy-1,ex,ey,'#060b11',6);pixelLine(ctx,ex,ey,hx-2,hy-2,'#060b11',6);
+      pixelLine(ctx,sx,sy,ex,ey,'#263440',4);pixelLine(ctx,ex,ey,hx-1,hy-1,'#33414b',4);
+      ctx.fillStyle='#ac9981';ctx.fillRect(Math.round(hx-3),Math.round(hy-1),6,2);
     }
-    ctx.save(); ctx.scale(dir, 1);
-    ctx.drawImage(this.actor('player', pose, frame), -32, -64);
+    if (!vaulting && p.rollTime <= 0) {
+      const recoil = Math.min((p.recoil || 0) / ({ pistol: 3, revolver: 7, smg: 2.3, shotgun: 9 }[id] || 3), 1);
+      const origin = p.crouching ? 21 : pose==='land' ? 34 : 38;
+      ctx.save(); ctx.translate(0, -origin); ctx.rotate(p.aim || 0);
+      if (aimDir < 0) ctx.scale(1, -1);
+      const hand = 13 - Math.round(recoil * 4);
+      ctx.fillStyle = '#090f16'; ctx.fillRect(-3, 0, hand + 5, 6);
+      ctx.fillStyle = '#263440'; ctx.fillRect(-2, 1, hand, 4);
+      ctx.fillStyle = '#53616b'; ctx.fillRect(0, 1, hand - 1, 1);
+      ctx.fillStyle = '#6b655e'; ctx.fillRect(hand, 1, 5, 3);
+      ctx.fillStyle = '#aba08b'; ctx.fillRect(hand + 3, 1, 2, 1);
+      ctx.translate(hand + 3, 0); this.drawGun(ctx, id, 1, p.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);ctx.restore();
+    } else {
+      // Weapon stays close to the body while both hands/shoulders do the work.
+      ctx.save();ctx.translate(dir*1,-25);ctx.scale(dir,1);ctx.rotate(.9);this.drawGun(ctx,id,.58);ctx.restore();
+    }
     ctx.restore();
-    const weapon = p.weapons?.[p.weaponIndex];
-    const id = weapon?.id || 'pistol';
-    const recoil = Math.min((p.recoil || 0) / ({ pistol: 3, revolver: 7, smg: 2.3, shotgun: 9 }[id] || 3), 1);
-    const origin = p.crouching ? 21 : p.vaultTime > 0 ? 32 : 38;
-    ctx.save(); ctx.translate(0, -origin); ctx.rotate(p.aim || 0);
-    if (dir < 0) ctx.scale(1, -1);
-    const hand = 13 - Math.round(recoil * 4);
-    ctx.fillStyle = '#090f16'; ctx.fillRect(-3, 0, hand + 5, 7);
-    ctx.fillStyle = '#263644'; ctx.fillRect(-2, 1, hand, 5);
-    ctx.fillStyle = '#53616b'; ctx.fillRect(0, 1, hand - 1, 1);
-    ctx.fillStyle = '#6b655e'; ctx.fillRect(hand, 1, 5, 4);
-    ctx.fillStyle = '#aba08b'; ctx.fillRect(hand + 3, 1, 2, 1);
-    ctx.translate(hand + 3, 0);
-    this.drawGun(ctx, id, 1, p.muzzle > 0 ? (game.settings?.flash ?? 0.5) : 0);
-    ctx.restore(); ctx.restore();
     if (p.upgrades?.dodgeShot && p.dodgeBuff > 0) glow(ctx, x, y - 36, 19, '#ecc36b25');
     if (weapon?.jammed) label(ctx, '총기 고장 · R 연타', x, y - (p.crouching ? 48 : 75), 12, '#e5a16f');
     else if (p.crouching) {
@@ -1797,7 +2027,19 @@ class Renderer {
     const progress = Math.max(0, Math.min(1, 1 - e.timer / (e.windupTotal || 1)));
     ctx.save();
     ctx.globalAlpha = 0.38 + progress * 0.4;
-    if (rusher || (boss && e.pattern === 'rush')) {
+    if (rusher && e.pattern === 'leap') {
+      const direction = e.chargeDir || (Math.cos(aim) >= 0 ? 1 : -1);
+      const length = 265, height = 122;
+      // A broken arc distinguishes a jumping lunge from a ground charge.
+      for (let i = 0; i < 18; i += 2) {
+        const a = i / 18, b = (i + 1) / 18;
+        pixelLine(ctx, e.x + direction * length * a, e.y - 10 - 4 * height * a * (1-a), e.x + direction * length * b, e.y - 10 - 4 * height * b * (1-b), '#f1aa73', 2);
+      }
+      const tip = e.x + direction * length;
+      pixelLine(ctx, tip - direction * 14, e.y - 26, tip, e.y - 10, '#f1aa73', 2);
+      pixelLine(ctx, tip, e.y - 10, tip - direction * 18, e.y - 10, '#f1aa73', 2);
+      label(ctx, '도약 준비', e.x, e.y - (e.h || 58) - 24, 10, '#efb687');
+    } else if (rusher || (boss && e.pattern === 'rush')) {
       const direction = boss ? (e.chargeDir || (Math.cos(aim) >= 0 ? 1 : -1)) : (Math.cos(aim) >= 0 ? 1 : -1);
       const length = boss ? 380 : 260;
       ctx.setLineDash([10, 9]);
@@ -1854,7 +2096,10 @@ class Renderer {
     const moving = entering || Math.abs(e.vx || 0) > 5;
     const frame = moving ? Math.floor(this.time * 9 + (entering ? (e.entry.progress || 0) * 5 : e.x * .02)) % 4 : 0;
     ctx.fillStyle = '#02040999'; ctx.fillRect(-20, -3, 40, 5);
-    ctx.save(); ctx.scale(dir, 1); ctx.drawImage(this.actor(e.type, 'stand', frame), -32, -64); ctx.restore();
+    ctx.save(); ctx.scale(dir, 1);
+    const enemyPose = rusher && (!e.grounded || e.airDashTime > 0) ? 'vault' : 'stand';
+    if(rusher && e.airDashTime > 0) { ctx.save();ctx.globalAlpha=.18;ctx.drawImage(this.actor(e.type,enemyPose,frame),-48,-64);ctx.restore(); }
+    ctx.drawImage(this.actor(e.type, enemyPose, frame), -32, -64); ctx.restore();
     ctx.save(); ctx.translate(0, -37); ctx.rotate(aim); if (dir < 0) ctx.scale(1, -1);
     const palette = ACTOR_COLORS[e.type];
     ctx.fillStyle = palette.ink; ctx.fillRect(0, 0, 16, heavy ? 9 : 7);
@@ -1962,6 +2207,30 @@ const GROUND = 640;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const mix = (a, b, t) => a + (b - a) * t;
 const easeOut = t => 1 - (1 - clamp(t, 0, 1)) ** 3;
+// Quintic motion begins and ends at rest, with continuous acceleration. It is
+// evaluated from elapsed simulation time, not integrated once per frame.
+const driveEase = value => { const t = clamp(value, 0, 1); return t * t * t * (t * (t * 6 - 15) + 10); };
+
+function vehicleSweep(game, event, previousX, dt) {
+  if (!['car', 'bossCar'].includes(event.kind) || dt <= 0 || !game.player) return;
+  event.velocity = (event.x - previousX) / dt;
+  event.speed = Math.abs(event.velocity);
+  if (event.speed < 70) return;
+  const leg = event.phase === 'approach' ? 'approach' : event.phase === 'depart' ? 'depart' : null;
+  if (!leg || event.hitPlayerByLeg?.[leg]) return;
+  const player = game.player, halfWidth = event.kind === 'bossCar' ? 139 : 122;
+  const bodyHeight = event.kind === 'bossCar' ? 91 : 85;
+  // Sweeping the car's horizontal extent prevents a fast car tunnelling over
+  // the player. A jump above the roof or a player behind the roadway is clear.
+  const left = Math.min(previousX, event.x) - halfWidth;
+  const right = Math.max(previousX, event.x) + halfWidth;
+  if (player.x + player.w / 2 < left || player.x - player.w / 2 > right || player.y <= event.y - bodyHeight || player.y - player.h >= event.y) return;
+  event.hitPlayerByLeg ||= {};
+  // Each moving leg can hit at most once, even when an invulnerability window
+  // expires while the large vehicle still overlaps the player.
+  event.hitPlayerByLeg[leg] = true;
+  game.applyVehicleImpact?.(event, { speed: event.speed, direction: Math.sign(event.velocity), x: clamp(player.x, left, right), y: Math.min(player.y, event.y - 35) });
+}
 
 function safePoint(game, point) {
   const def = ENEMY_TYPES[point.type];
@@ -1969,6 +2238,7 @@ function safePoint(game, point) {
   if (point.x < 50 || point.x > game.room.width - 100) return false;
   if (point.y !== GROUND && !game.room.platforms.some(p => point.y === p.y && point.x - def.w / 2 >= p.x && point.x + def.w / 2 <= p.x + p.w)) return false;
   if (game.room.covers.some(c => c.hp > 0 && point.x + def.w / 2 + 10 > c.x && point.x - def.w / 2 - 10 < c.x + c.w && point.y > c.y && point.y - def.h < c.y + c.h)) return false;
+  if ((game.room.hazards || []).some(h => point.x + def.w / 2 + 12 > h.x && point.x - def.w / 2 - 12 < h.x + h.w && point.y > h.y && point.y - def.h < h.y + h.h)) return false;
   return !game.enemies.some(e => !e.dead && Math.abs(e.x - point.x) < (e.w + def.w) / 2 + 42 && Math.abs(e.y - point.y) < Math.max(e.h, def.h) + 12);
 }
 
@@ -1991,16 +2261,18 @@ function makeArrival(game, kind, point, ordinal) {
   const boss = kind === 'bossCar';
   const fromRight = point.x > game.player.x;
   const approach = car ? (boss ? 2.05 : 1.5) : train ? 1.65 : kind === 'road' ? 0.2 : 0.35;
+  const warning = car ? 0.9 : 0;
   const unload = boss ? 2.2 : car || train ? 1.65 : kind === 'road' ? 2.4 : 1.05;
   const depart = car || train ? 2.1 : 0.7;
+  const departureWarning = car ? 0.75 : 0;
   const toX = point.x + (car ? 25 : 0);
   const fromX = car || train ? (fromRight ? game.room.width + 220 : -260) : kind === 'road' ? (fromRight ? game.room.width + 40 : -40) : toX;
   const event = {
     id: `${game.room.index}:${game.room.wave}:${ordinal}`,
     kind, x: fromX, y: point.y, fromX, toX,
-    elapsed: 0, duration: approach + unload + depart,
-    approach, unload, depart, doorOpen: false, enemyIds: [], phase: 'approach',
-    facing: fromRight ? -1 : 1, drift: 0,
+    elapsed: 0, duration: warning + approach + unload + departureWarning + depart,
+    warning, approach, unload, departureWarning, depart, doorOpen: false, enemyIds: [], phase: warning ? 'warning' : 'approach',
+    facing: fromRight ? -1 : 1, drift: 0, velocity: 0, speed: 0, hitPlayerByLeg: {},
   };
   game.arrivals.push(event);
   return event;
@@ -2032,7 +2304,7 @@ function createEncounter(game) {
     if (vehicle && vehicle.kind === kind && Math.abs(vehicle.toX - point.x) < 170 && vehicle.enemyIds.length < 2) event = vehicle;
     else { event = makeArrival(game, kind, point, i); if (kind === 'car' || kind === 'train') vehicle = event; }
     const delay = event.enemyIds.length * 0.24;
-    const appearance = event.approach + delay;
+    const appearance = event.warning + event.approach + delay;
     const warning = Math.max(room.boss && point.type !== 'boss' ? 4.6 : 0, appearance + event.unload - 0.15);
     const enemy = game.spawnEnemy(point, warning);
     // Only render coordinates move during the arrival; collision remains at the
@@ -2057,34 +2329,47 @@ function createEncounter(game) {
 function updateEncounters(game, dt) {
   if (!game.arrivals?.length) return;
   for (const event of game.arrivals) {
+    const previousX = event.x;
     event.elapsed += dt;
+    const warning = event.warning || 0, departureWarning = event.departureWarning || 0;
+    const approachEnd = warning + event.approach;
+    const unloadEnd = approachEnd + event.unload;
+    const departStart = unloadEnd + departureWarning;
     // These latches belong to the encounter, so a frame rate change or pause
     // never repeats a rev, tyre squeal, brake or door slam.
     if (!event.soundStarted) {
       event.soundStarted = true;
       if (event.kind === 'car' || event.kind === 'bossCar') game.emitSound('engine', { volume: event.kind === 'bossCar' ? 0.75 : 0.35 });
     }
-    if (!event.soundBraked && event.elapsed >= event.approach * 0.68) {
+    if (!event.soundBraked && event.elapsed >= warning + event.approach * 0.68) {
       event.soundBraked = true;
       if (event.kind === 'bossCar' || event.kind === 'car') game.emitSound('skid', { volume: event.kind === 'bossCar' ? 0.85 : 0.28 });
       else if (event.kind === 'train') game.emitSound('trainBrake', { volume: 0.45 });
     }
-    if (!event.soundOpened && event.elapsed >= event.approach) {
+    if (!event.soundOpened && event.elapsed >= approachEnd) {
       event.soundOpened = true;
       if (event.kind !== 'road') game.emitSound('arrivalDoor', { volume: event.kind === 'bossCar' ? 0.8 : 0.3 });
     }
-    const entering = event.elapsed < event.approach;
-    const unloading = event.elapsed < event.approach + event.unload;
-    event.phase = entering ? 'approach' : unloading ? 'unload' : 'depart';
-    event.doorOpen = !entering && unloading;
-    const p = clamp(event.elapsed / event.approach, 0, 1);
-    event.drift = event.kind === 'bossCar' && entering ? Math.sin(p * Math.PI) * 0.16 : 0;
-    if (entering) event.x = mix(event.fromX, event.toX, easeOut(p)) + (event.kind === 'bossCar' ? Math.sin(p * Math.PI) * 44 : 0);
-    else if (unloading) event.x = event.toX;
-    else if (event.kind === 'car' || event.kind === 'bossCar' || event.kind === 'train') {
-      const leaving = clamp((event.elapsed - event.approach - event.unload) / event.depart, 0, 1);
-      event.x = mix(event.toX, event.facing < 0 ? -300 : game.room.width + 300, leaving * leaving);
+    if (!event.soundDeparted && event.elapsed >= unloadEnd) {
+      event.soundDeparted = true;
+      if (event.kind === 'car' || event.kind === 'bossCar') game.emitSound('engine', { volume: 0.5 });
     }
+    const entering = event.elapsed >= warning && event.elapsed < approachEnd;
+    const unloading = event.elapsed >= approachEnd && event.elapsed < unloadEnd;
+    event.phase = event.elapsed < warning ? 'warning' : entering ? 'approach' : unloading ? 'unload' : event.elapsed < departStart ? 'departureWarning' : 'depart';
+    event.doorOpen = unloading;
+    const progress = clamp((event.elapsed - warning) / event.approach, 0, 1);
+    event.drift = event.kind === 'bossCar' && entering ? Math.sin(progress * Math.PI) * 0.16 : 0;
+    if (event.elapsed < warning) event.x = event.fromX;
+    else if (entering) event.x = mix(event.fromX, event.toX, driveEase(progress));
+    else if (event.elapsed < departStart) event.x = event.toX;
+    else if (event.kind === 'car' || event.kind === 'bossCar' || event.kind === 'train') {
+      const leaving = clamp((event.elapsed - departStart) / event.depart, 0, 1);
+      event.x = mix(event.toX, event.facing < 0 ? -300 : game.room.width + 300, driveEase(leaving));
+    }
+    event.velocity = dt > 0 ? (event.x - previousX) / dt : 0;
+    event.speed = Math.abs(event.velocity);
+    vehicleSweep(game, event, previousX, dt);
     for (const id of event.enemyIds) {
       const enemy = game.enemies.find(e => e.id === id);
       if (!enemy || enemy.dead || !enemy.entry) continue;
@@ -2095,7 +2380,7 @@ function updateEncounters(game, dt) {
       entry.visible = event.elapsed >= entry.appearance;
       entry.progress = clamp((event.elapsed - entry.appearance) / Math.max(0.1, entry.readyAt - entry.appearance), 0, 1);
       entry.drawX = mix(entry.fromX, entry.targetX, easeOut(entry.progress));
-      entry.drawY = entry.targetY;
+      entry.drawY = event.kind === 'train' ? mix(entry.targetY - 80, entry.targetY, entry.progress) : entry.targetY;
       if (entry.visible) enemy.animation += dt * 7;
     }
   }
@@ -2109,6 +2394,7 @@ return { createEncounter, updateEncounters };
 __modules["./game.js"] = (() => {
 const { WEAPONS, UPGRADES, ZONES, ENEMY_TYPES, generateRoom } = __modules["./data.js"];
 const { createEncounter, updateEncounters } = __modules["./encounters.js"];
+const { PLAYER_HEADS, getPlayerPose } = __modules["./motion.js"];
 const WIDTH = 1280, HEIGHT = 720, GROUND = 640, STEP = 1 / 120;
 const SAVE_KEY = 'last-bullet-before-dawn-v1';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -2128,6 +2414,23 @@ function segmentRect(x1, y1, x2, y2, rect, padding = 0) {
   return tmin >= 0 && tmin <= 1 ? tmin : null;
 }
 const actorRect = a => ({ x: a.x - a.w / 2, y: a.y - a.h, w: a.w, h: a.h });
+// Resolve the first anatomical surface touched, rather than awarding a headshot
+// to a bullet that first travelled through the torso. Walls use the same sweep.
+function actorHit(b, nx, ny, a, player = false) {
+  const top = a.y - a.h;
+  let headRect = { x: a.x - a.w * 0.28, y: top, w: a.w * 0.56, h: 12 }, bodyTop = top + 12;
+  if (player) {
+    const { pose, frame, dir } = getPlayerPose(a);
+    const [hx, hy] = pose === 'roll' ? PLAYER_HEADS.roll[frame] : PLAYER_HEADS[pose];
+    headRect = { x: a.x + (hx - 32) * dir - 8, y: a.y - 64 + hy - 5, w: 16, h: 14 };
+    bodyTop = pose === 'roll' ? Math.min(top, headRect.y + headRect.h) : headRect.y + headRect.h;
+  }
+  const head = segmentRect(b.x, b.y, nx, ny, headRect, b.radius);
+  const body = segmentRect(b.x, b.y, nx, ny, { x: a.x - a.w / 2, y: bodyTop, w: a.w, h: a.y - bodyTop }, b.radius);
+  if (head === null && body === null) return null;
+  const headshot = head !== null && (body === null || head < body);
+  return { t: headshot ? head : body, headshot };
+}
 
 class Game {
   constructor(options = {}) {
@@ -2147,7 +2450,7 @@ class Game {
     this.rewardChoices = []; this.toast = { text: '', time: 0 }; this.notice = '';
     this.input = { keys: new Set(), mouse: { x: 850, y: 380, left: false, right: false }, pressed: new Set() };
     this.accumulator = 0; this.shake = 0; this.flash = 0; this.slowActive = false; this.hitStop = 0;
-    this.stats = { shots: 0, hits: 0, damageTaken: 0, roomsCleared: 0 };
+    this.stats = { shots: 0, hits: 0, headshots: 0, damageTaken: 0, roomsCleared: 0 };
     this.nextEnemyId = 1; this.nextBulletId = 1; this.waveDelay = 0;
     this.bound = false; this.endingSaved = false;
   }
@@ -2159,13 +2462,13 @@ class Game {
   getWeapon() { return this.player?.weapons[this.player.weaponIndex] || null; }
   getWeaponDef() { return WEAPONS[this.getWeapon()?.id] || WEAPONS.pistol; }
   magazine(id) { return Math.ceil(WEAPONS[id].magazine * (1 + this.stack('extendedMag') * 0.25)); }
-  createWeapon(id) { return { id, ammo: this.magazine(id), cooldown: 0, reload: 0, reloadTotal: 0, heat: 0, durability: 100, wetness: 0, jammed: false, jamReason: '', clearProgress: 0, maintenance: 0 }; }
+  createWeapon(id) { return { id, ammo: this.magazine(id), cooldown: 0, reload: 0, reloadTotal: 0, heat: 0, durability: 100, wetness: 0, jammed: false, jamReason: '', clearProgress: 0, maintenance: 0, jamGrace: 0 }; }
   startRun(seed) {
     this.seed = (seed ?? Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0; this.rng = seededRandom(this.seed);
     this.weatherRng = seededRandom(this.seed ^ 0x6B24A3D1);
     this.roomIndex = 0; this.zoneIndex = 0; this.time = 0; this.kills = 0; this.score = 0;
-    this.stats = { shots: 0, hits: 0, damageTaken: 0, roomsCleared: 0 }; this.endingSaved = false;
-    this.player = { x: 150, y: GROUND, vx: 0, vy: 0, w: 30, h: 58, hp: 100, maxHp: 100, aim: 0, facing: 1, grounded: true, coyote: 0.1, jumpBuffer: 0, rollTime: 0, rollCooldown: 0, rollDir: 1, invuln: 0, slow: 100, maxSlow: 100, recoil: 0, weaponIndex: 0, weapons: [], upgrades: {}, hurt: 0, muzzle: 0, dodgeBuff: 0, reloadBuff: 0, swapBuff: 0, animation: 0 };
+    this.stats = { shots: 0, hits: 0, headshots: 0, damageTaken: 0, roomsCleared: 0 }; this.endingSaved = false;
+    this.player = { x: 150, y: GROUND, vx: 0, vy: 0, w: 30, h: 58, hp: 50, maxHp: 50, aim: 0, facing: 1, grounded: true, coyote: 0.1, jumpBuffer: 0, rollTime: 0, rollCooldown: 0, rollDir: 1, invuln: 0, slow: 100, maxSlow: 100, recoil: 0, weaponIndex: 0, weapons: [], upgrades: {}, hurt: 0, muzzle: 0, dodgeBuff: 0, reloadBuff: 0, swapBuff: 0, animation: 0 };
     this.player.weapons = [this.createWeapon('pistol')];
     Object.assign(this.player, { crouching: false, sheltered: false, vaultTime: 0, vaultCooldown: 0, vault: null, maintenanceBlocked: false });
     this.clearInput(); this.shake = 0; this.flash = 0; this.hitStop = 0; this.accumulator = 0;
@@ -2214,7 +2517,8 @@ class Game {
   update(dt) {
     if (this.mode !== 'playing') return;
     const p = this.player;
-    for (const key of ['invuln', 'hurt', 'rollCooldown', 'vaultCooldown', 'muzzle', 'dodgeBuff', 'reloadBuff', 'swapBuff']) p[key] = Math.max(0, p[key] - dt);
+    for (const key of ['invuln', 'hurt', 'rollCooldown', 'vaultCooldown', 'muzzle', 'dodgeBuff', 'reloadBuff', 'swapBuff', 'landingTime', 'knockbackTime']) p[key] = Math.max(0, p[key] - dt);
+    p.motionTime += dt;
     this.toast.time = Math.max(0, this.toast.time - dt); this.shake = Math.max(0, this.shake - dt * 24); this.flash = Math.max(0, this.flash - dt * 5);
     p.recoil = Math.max(0, p.recoil - dt * 8);
     const press = this.input.pressed;
@@ -2227,9 +2531,12 @@ class Game {
     press.clear();
     if (this.mode !== 'playing') return;
     this.updatePlayer(dt);
+    this.updateHazards(dt);
+    if (this.mode !== 'playing') return;
     this.updateWeather(dt);
     this.updateWeaponCondition(dt);
     updateEncounters(this, dt);
+    if (this.mode !== 'playing') return;
     for (const weapon of p.weapons) {
       weapon.cooldown = Math.max(0, weapon.cooldown - dt); weapon.heat = Math.max(0, weapon.heat - dt * 0.8);
       if (weapon.reload > 0) { weapon.reload = Math.max(0, weapon.reload - dt); if (weapon.reload === 0) { weapon.ammo = this.magazine(weapon.id); this.emitSound('reloadDone'); this.notify(`${WEAPONS[weapon.id].name} · 재장전 완료`, 1.2); } }
@@ -2255,24 +2562,27 @@ class Game {
       } else {
         p.x = position.x; p.y = position.y; p.vaultTime = Math.max(0, v.duration - v.elapsed);
         p.vx = p.vy = 0; p.grounded = false;
-        if (p.vaultTime === 0) { p.vault = null; p.grounded = true; }
+        if (p.vaultTime === 0) { p.vault = null; p.grounded = true; p.landingTime = 0.18; }
         p.aim = Math.atan2(this.input.mouse.y - (p.y - 38), this.input.mouse.x + this.camera.x - p.x);
         return;
       }
     }
     const wantsCrouch = keys.has('KeyC') && p.grounded && p.rollTime <= 0;
     const headBlocked = this.room.covers.some(c => c.hp > 0 && this.rectOverlaps({ x: p.x - p.w / 2, y: p.y - 58, w: p.w, h: 58 }, c));
-    p.crouching = wantsCrouch || (p.crouching && headBlocked); p.h = p.crouching ? 34 : 58;
+    p.crouching = wantsCrouch || (p.crouching && headBlocked); p.h = p.crouching || p.rollTime > 0 ? 34 : 58;
     p.aim = Math.atan2(this.input.mouse.y - (p.y - (p.crouching ? 21 : 38)), this.input.mouse.x + this.camera.x - p.x);
     p.facing = Math.cos(p.aim) >= 0 ? 1 : -1;
     p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - dt);
     p.jumpBuffer = Math.max(0, p.jumpBuffer - dt);
     if (p.jumpBuffer > 0 && p.coyote > 0 && p.rollTime <= 0 && !headBlocked) { p.crouching = false; p.h = 58; p.vy = -760; p.grounded = false; p.coyote = 0; p.jumpBuffer = 0; this.burst(p.x, p.y, 5, '#828b91', 'smoke'); }
     const move = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-    if (p.rollTime > 0) { p.rollTime = Math.max(0, p.rollTime - dt); p.vx = p.rollDir * 670; if (p.rollTime === 0) p.dodgeBuff = 1.2; }
+    if (p.knockbackTime > 0) { p.vx = p.knockbackX; p.knockbackX *= Math.exp(-dt * 3); }
+    else if (p.rollTime > 0) { p.rollTime = Math.max(0, p.rollTime - dt); p.vx = p.rollDir * 670; if (p.rollTime === 0) { p.dodgeBuff = 1.2; p.h = p.crouching ? 34 : 58; } }
     else p.vx = approach(p.vx, move * (p.crouching ? 130 : 310) * (this.getWeapon().maintenance > 0.25 ? 0.45 : 1) * (1 + 0.1 * this.stack('quickFeet')), (p.grounded ? 2500 : 1700) * dt);
     p.animation += Math.abs(p.vx) * dt / 42;
+    const wasAirborne = !p.grounded && p.vy > 100;
     this.moveActor(p, dt);
+    if (wasAirborne && p.grounded) { p.landingTime = 0.18; this.burst(p.x, p.y, 4, '#65717a', 'smoke'); }
   }
   moveActor(a, dt) {
     const oldX = a.x, oldY = a.y;
@@ -2289,30 +2599,34 @@ class Game {
   }
   roll() {
     const p = this.player;
-    if (p.rollCooldown > 0 || p.rollTime > 0 || p.vaultTime > 0) return false;
+    if (p.rollCooldown > 0 || p.rollTime > 0 || p.vaultTime > 0 || p.knockbackTime > 0) return false;
     p.rollDir = (this.input.keys.has('KeyD') ? 1 : 0) - (this.input.keys.has('KeyA') ? 1 : 0) || p.facing;
-    p.rollTime = 0.28; p.rollCooldown = 1.25 * (1 - this.stack('quickFeet') * 0.15); p.invuln = Math.max(p.invuln, 0.24);
+    p.rollTotal = p.rollTime = 0.28; p.rollCooldown = 1.25 * (1 - this.stack('quickFeet') * 0.15); p.invuln = Math.max(p.invuln, 0.24);
     this.emitSound('roll'); this.burst(p.x, p.y - 10, 8, '#7f8c98', 'smoke'); return true;
   }
   rectOverlaps(a, b) { return a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 && a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01; }
   vaultPosition(v, t) {
     const smooth = n => n * n * (3 - 2 * n);
-    if (t < 0.32) return { x: v.startX, y: v.startY + (v.topY - v.startY) * smooth(t / 0.32) };
-    if (t < 0.75) return { x: v.startX + (v.endX - v.startX) * smooth((t - 0.32) / 0.43), y: v.topY };
-    return { x: v.endX, y: v.topY + (v.endY - v.topY) * smooth((t - 0.75) / 0.25) };
+    const plantX = v.plantX ?? v.startX;
+    if (t < 0.16) return { x: v.startX + (plantX - v.startX) * smooth(t / 0.16), y: v.startY };
+    if (t < 0.40) return { x: plantX, y: v.startY + (v.topY - v.startY) * smooth((t - 0.16) / 0.24) };
+    if (t < 0.78) return { x: plantX + (v.endX - plantX) * smooth((t - 0.40) / 0.38), y: v.topY };
+    return { x: v.endX, y: v.topY + (v.endY - v.topY) * smooth((t - 0.78) / 0.22) };
   }
   vault() {
     const p = this.player;
-    if (!p.grounded || p.rollTime > 0 || p.vaultTime > 0 || p.vaultCooldown > 0) return false;
+    if (!p.grounded || p.rollTime > 0 || p.vaultTime > 0 || p.vaultCooldown > 0 || p.knockbackTime > 0) return false;
     const dir = (this.input.keys.has('KeyD') ? 1 : 0) - (this.input.keys.has('KeyA') ? 1 : 0) || p.facing;
     const candidates = this.room.covers.filter(c => c.hp > 0 && p.y - c.y >= 12 && p.y - c.y <= 100 && c.w <= 130)
       .map(c => ({ c, gap: dir > 0 ? c.x - (p.x + p.w / 2) : p.x - p.w / 2 - (c.x + c.w) }))
       .filter(item => item.gap >= -0.1 && item.gap <= 54).sort((a, b) => a.gap - b.gap);
     const obstacle = candidates[0]?.c;
     if (!obstacle) { this.notify('낮은 상자나 담 가까이에서 F · 높이 100 이하', 1.3); return false; }
+    if (obstacle.vaultable === false || obstacle.kind === 'wire') { this.notify('철조망 · 손을 짚을 수 없습니다. 충분히 높게 점프하세요', 2); return false; }
     const endX = dir > 0 ? obstacle.x + obstacle.w + p.w / 2 + 10 : obstacle.x - p.w / 2 - 10;
     if (endX < p.w / 2 + 8 || endX > this.room.width - p.w / 2 - 8) return false;
-    const v = { startX: p.x, startY: p.y, endX, endY: p.y, topY: obstacle.y - 8, duration: 0.55, elapsed: 0 };
+    const v = { startX: p.x, startY: p.y, endX, endY: p.y, topY: obstacle.y - 8, duration: obstacle.kind === 'barricade' ? 0.48 : 0.55, elapsed: 0, kind: obstacle.kind === 'barricade' ? 'barricade' : 'cover', obstacleX: obstacle.x, obstacleY: obstacle.y, obstacleW: obstacle.w, dir };
+    v.plantX = dir > 0 ? obstacle.x - p.w / 2 - 2 : obstacle.x + obstacle.w + p.w / 2 + 2;
     for (let sample = 0; sample <= 40; sample++) {
       const point = this.vaultPosition(v, sample / 40), rect = { x: point.x - p.w / 2, y: point.y - 58, w: p.w, h: 58 };
       if (this.room.covers.some(c => c.hp > 0 && this.rectOverlaps(rect, c))) { this.notify('넘어갈 공간이 부족합니다', 1.2); return false; }
@@ -2329,12 +2643,12 @@ class Game {
       if (w.timer <= 0) {
         w.target = w.target > 0 ? 0 : 0.65 + this.weatherRng() * 0.35;
         w.timer = w.target > 0 ? 16 + this.weatherRng() * 10 : 22 + this.weatherRng() * 20;
-        this.notify(w.target > 0 ? '소나기 · 차양 아래에서 총기를 보호하세요' : '비가 잦아든다 · 젖은 총을 정비할 시간', 3);
+        this.notify(w.target > 0 ? '소나기 · 빗물이 총에 쌓인다. R을 길게 눌러 점검' : '비가 잦아든다 · 젖음은 총기 점검으로만 제거', 3);
       }
       w.intensity = approach(w.intensity, w.target, dt * 0.28);
       w.kindlabel = w.intensity > 0.15 ? '소나기' : '비 그침';
     }
-    p.sheltered = !this.room.weatherAllowed || (this.room.shelters || []).some(s => p.x >= s.x && p.x <= s.x + s.w && p.y - p.h >= s.y);
+    p.sheltered = false;
   }
   jamWeapon(weapon, reason) {
     if (weapon.jammed) return;
@@ -2348,24 +2662,25 @@ class Game {
     weapon.clearProgress = Math.min(5, weapon.clearProgress + 1); this.emitSound('reload');
     if (weapon.clearProgress < 5) { this.notify(`총기 복구 ${weapon.clearProgress}/5 · R 연타`, 1.5); return false; }
     weapon.jammed = false; weapon.jamReason = ''; weapon.clearProgress = 0;
-    weapon.wetness = Math.min(30, weapon.wetness); weapon.durability = Math.max(35, weapon.durability);
+    weapon.durability = Math.max(35, weapon.durability); weapon.jamGrace = 5;
     this.player.maintenanceBlocked = true;
-    this.notify('작동 복구 · 내구도는 R을 길게 눌러 정비', 2.5); this.emitSound('reloadDone'); return true;
+    this.notify('작동 복구 · 젖음 유지! 5초 안에 R을 다시 길게 눌러 점검', 3); this.emitSound('reloadDone'); return true;
   }
   updateWeaponCondition(dt) {
     const p = this.player, active = this.getWeapon(), held = this.input.keys.has('KeyR');
     if (!held) p.maintenanceBlocked = false;
     for (const weapon of p.weapons) {
-      const exposed = weapon === active && !p.sheltered && this.weather.intensity > 0.05;
+      const exposed = weapon === active && this.room.weatherAllowed && this.weather.intensity > 0.05;
+      weapon.jamGrace = Math.max(0, (weapon.jamGrace || 0) - dt);
       const previousWetness = weapon.wetness;
-      weapon.wetness = clamp(weapon.wetness + dt * (exposed ? this.weather.intensity * 7 : weapon === active ? -8 : -3), 0, 100);
-      if (weapon === active && previousWetness < 65 && weapon.wetness >= 65 && !weapon.jammed) this.notify('총이 젖고 있습니다 · 차양으로 이동하거나 R을 길게 눌러 정비', 3);
-      if (weapon.wetness >= 85) this.jamWeapon(weapon, 'rain');
+      weapon.wetness = clamp(weapon.wetness + dt * (exposed ? this.weather.intensity * 7 : 0), 0, 100);
+      if (weapon === active && previousWetness < 65 && weapon.wetness >= 65 && !weapon.jammed) this.notify('총이 젖고 있습니다 · R을 1.4초 길게 눌러 점검', 3);
+      if (weapon.wetness >= 85 && weapon.jamGrace <= 0) this.jamWeapon(weapon, 'rain');
       if (weapon !== active || !held || weapon.jammed || p.maintenanceBlocked || p.rollTime > 0 || p.vaultTime > 0 || (weapon.durability >= 100 && weapon.wetness <= 0)) { weapon.maintenance = 0; continue; }
       weapon.maintenance += dt;
       if (weapon.maintenance >= 1.4) {
-        weapon.durability = 100; weapon.wetness = Math.max(0, weapon.wetness - 45); weapon.maintenance = 0;
-        p.maintenanceBlocked = true; this.notify('현장 정비 완료 · 내구도 100 / 젖음 −45', 2); this.emitSound('reloadDone');
+        weapon.durability = 100; weapon.wetness = 0; weapon.maintenance = 0; weapon.jamGrace = 0;
+        p.maintenanceBlocked = true; this.notify('총기 점검 완료 · 내구도 100 / 젖음 0%', 2); this.emitSound('reloadDone');
       }
     }
   }
@@ -2412,17 +2727,20 @@ class Game {
       b.life -= dt; b.travel += Math.hypot(nx - b.x, ny - b.y);
       const hits = [];
       for (const c of [...this.room.covers, ...this.room.platforms]) { if (c.hp !== undefined && c.hp <= 0) continue; const t = segmentRect(b.x, b.y, nx, ny, c, b.radius); if (t !== null) hits.push({ t, kind: 'wall', target: c }); }
-      if (b.owner === 'player') for (const enemy of this.enemies) { if (enemy.dead || enemy.spawnTime > 0 || b.hitIds.has(enemy.id)) continue; const t = segmentRect(b.x, b.y, nx, ny, actorRect(enemy), b.radius); if (t !== null) hits.push({ t, kind: 'enemy', target: enemy }); }
-      else { const t = segmentRect(b.x, b.y, nx, ny, actorRect(this.player), b.radius); if (t !== null) hits.push({ t, kind: 'player', target: this.player }); }
+      if (b.owner === 'player') for (const enemy of this.enemies) { if (enemy.dead || enemy.spawnTime > 0 || b.hitIds.has(enemy.id)) continue; const hit = actorHit(b, nx, ny, enemy); if (hit) hits.push({ ...hit, kind: 'enemy', target: enemy }); }
+      else { const hit = actorHit(b, nx, ny, this.player, true); if (hit) hits.push({ ...hit, kind: 'player', target: this.player }); }
       hits.sort((a, c) => a.t - c.t);
       for (const hit of hits) {
         const hx = b.x + (nx - b.x) * hit.t, hy = b.y + (ny - b.y) * hit.t;
         if (hit.kind === 'wall') { const c = hit.target; if (c.destructible && c.hp > 0) { c.hp -= b.damage; if (c.hp <= 0) { this.burst(c.x + c.w / 2, c.y + c.h / 2, 18, '#a88b67'); this.emitSound('hit'); } } this.burst(hx, hy, 4, '#ddb875'); b.life = -1; break; }
-        if (hit.kind === 'player') { this.damagePlayer(b.damage); b.life = -1; if (this.mode !== 'playing') return; break; }
+        if (hit.kind === 'player') { this.damagePlayer(b.damage * (hit.headshot ? 1.5 : 1), { headshot: hit.headshot }); b.life = -1; if (this.mode !== 'playing') return; break; }
         const e = hit.target; let damage = b.damage;
+        const headshot = hit.headshot && (b.weaponId === 'pistol' || b.weaponId === 'revolver');
+        if (headshot) damage *= WEAPONS[b.weaponId].headMultiplier;
         if (b.weaponId === 'shotgun') damage *= clamp(1 - Math.max(0, b.travel - 150) / 720, 0.28, 1);
         if (Math.hypot(e.x - b.originX, e.y - b.originY) <= 300) damage *= 1 + this.stack('closeRange') * 0.25;
         b.hitIds.add(e.id); this.damageEnemy(e, damage); this.stats.hits++;
+        if (headshot) { this.stats.headshots++; this.particles.push({ x: hx, y: hy - 14, vx: 0, vy: -32, life: 0.7, maxLife: 0.7, size: 12, type: 'text', text: '헤드샷 ×2', color: '#f4d799' }); }
         this.burst(hx, hy, 5, '#c24b45', 'blood');
         if (b.pierce > 0) b.pierce--; else { b.life = -1; break; }
       }
@@ -2431,11 +2749,28 @@ class Game {
     }
     this.bullets = this.bullets.filter(b => b.life > 0); this.room.covers = this.room.covers.filter(c => c.hp > 0);
   }
-  damagePlayer(amount) {
-    const p = this.player; if (this.mode !== 'playing' || p.invuln > 0 || p.hp <= 0) return false;
-    p.hp = Math.max(0, p.hp - amount); p.invuln = 0.65; p.hurt = 0.3; this.stats.damageTaken += amount;
+  damagePlayer(amount, { headshot = false, hazard = false } = {}) {
+    const p = this.player; if (this.mode !== 'playing' || (!hazard && p.invuln > 0) || p.hp <= 0) return false;
+    p.hp = Math.max(0, p.hp - amount); if (!hazard) p.invuln = 0.65; p.hurt = 0.3; this.stats.damageTaken += amount;
     this.shake = 9; this.flash = 0.5; this.emitSound('hurt'); this.burst(p.x, p.y - 30, 10, '#c34849', 'blood');
-    if (p.hp <= 0) this.endRun(false); else this.notify(`피격 −${Math.round(amount)} · 엄폐하거나 회피하세요`, 1.2); return true;
+    if (p.hp <= 0) this.endRun(false); else this.notify(hazard ? `철조망 −${Math.round(amount)} · 가시에서 벗어나세요` : `${headshot ? '머리 피격 ×1.5' : '피격'} −${Math.round(amount)} · 엄폐하거나 회피하세요`, 1.2); return true;
+  }
+  updateHazards(dt) {
+    const p = this.player;
+    p.wireCooldown = Math.max(0, p.wireCooldown - dt);
+    if (p.wireCooldown > 0) return;
+    const contact = (this.room.hazards || []).find(h => h.kind === 'wire' && this.rectOverlaps(actorRect(p), h));
+    if (contact) { p.wireCooldown = contact.interval || 0.5; this.damagePlayer(contact.damage || 3, { hazard: true }); }
+  }
+  applyVehicleImpact(event, { speed, direction }) {
+    const damage = clamp(Math.round(speed * 0.025), 8, 30);
+    if (!this.damagePlayer(damage)) return false;
+    const p = this.player;
+    p.knockbackX = clamp(speed * 0.45, 120, 560) * direction; p.knockbackTime = 0.32;
+    p.vx = p.knockbackX; p.vy = -clamp(speed * 0.16, 100, 240); p.grounded = false;
+    p.vault = null; p.vaultTime = 0; p.rollTime = 0; p.coyote = 0; p.jumpBuffer = 0;
+    if (this.mode === 'playing') this.notify(`차량 충돌 −${damage} · 헤드라이트를 보면 점프하거나 회피`, 2);
+    return true;
   }
   damageEnemy(enemy, damage) {
     if (this.mode !== 'playing' || this.player.hp <= 0 || enemy.dead || enemy.spawnTime > 0) return false;
@@ -2452,7 +2787,7 @@ class Game {
   }
   spawnEnemy(point, warning = 1) {
     const def = ENEMY_TYPES[point.type];
-    const enemy = { ...def, type: point.type, id: this.nextEnemyId++, x: point.x, y: point.y, vx: 0, vy: 0, hp: def.hp, maxHp: def.hp, aim: Math.PI, facing: -1, state: 'idle', timer: 0.5 + this.rng() * 1.1, flash: 0, muzzle: 0, phase: 1, pattern: 'fan', patternIndex: 0, spawnTime: warning, grounded: true, dead: false, attackHit: false, burstLeft: 0, shotTimer: 0, windupTotal: def.windup, animation: 0 };
+    const enemy = { ...def, type: point.type, id: this.nextEnemyId++, x: point.x, y: point.y, vx: 0, vy: 0, hp: def.hp, maxHp: def.hp, aim: Math.PI, facing: -1, state: 'idle', timer: 0.5 + this.rng() * 1.1, flash: 0, muzzle: 0, phase: 1, pattern: 'fan', patternIndex: 0, spawnTime: warning, grounded: true, dead: false, attackHit: false, burstLeft: 0, shotTimer: 0, windupTotal: def.windup, animation: 0, jumpCooldown: 0, airDashTime: 0, airDashDir: 0 };
     this.enemies.push(enemy); return enemy;
   }
   spawnWave() { createEncounter(this); }
@@ -2472,11 +2807,15 @@ class Game {
     e.facing = dx >= 0 ? 1 : -1;
     if (e.state !== 'windup' && e.state !== 'attack') e.aim = Math.atan2(dy, dx);
     e.timer -= dt;
+    e.jumpCooldown = Math.max(0, e.jumpCooldown - dt); e.airDashTime = Math.max(0, e.airDashTime - dt);
     if (e.type === 'boss') { this.updateBoss(e, dt, dx, dist); this.moveActor(e, dt); return; }
     if (e.state === 'idle') {
       const desiredRange = e.type === 'rusher' ? 90 : e.type === 'shotgun' ? 300 : Math.min(e.range * 0.65, 650);
       e.vx = Math.abs(dx) > desiredRange ? e.facing * e.speed : e.type !== 'rusher' && Math.abs(dx) < 140 ? -e.facing * e.speed * 0.7 : 0;
-      if (e.timer <= 0 && dist < (e.type === 'rusher' ? 300 : e.range)) {
+      const obstacleAhead = e.type === 'rusher' && this.room.covers.some(c => c.hp > 0 && e.y > c.y + 5 && e.y - c.y < 150 && (e.facing > 0 ? c.x - (e.x + e.w / 2) : e.x - e.w / 2 - c.x - c.w) >= -2 && (e.facing > 0 ? c.x - (e.x + e.w / 2) : e.x - e.w / 2 - c.x - c.w) < 85);
+      const leap = e.type === 'rusher' && e.grounded && e.jumpCooldown <= 0 && (obstacleAhead || (p.y < e.y - 45 && Math.abs(dx) < 440));
+      if (leap || (e.timer <= 0 && dist < (e.type === 'rusher' ? 330 : e.range))) {
+        e.pattern = leap ? 'leap' : 'dash';
         e.state = 'windup'; e.timer = e.windup; e.windupTotal = e.windup; e.lockedAim = e.aim; e.vx = 0;
       }
     } else if (e.state === 'windup') {
@@ -2485,18 +2824,21 @@ class Game {
       if (e.timer > 0.32) { e.aim = Math.atan2(dy, dx); e.lockedAim = e.aim; }
       if (e.timer <= 0) {
         e.state = 'attack'; e.lockedAim = e.aim; e.attackHit = false;
-        if (e.type === 'rusher') { e.timer = 0.36; e.chargeDir = Math.cos(e.lockedAim) >= 0 ? 1 : -1; }
+        if (e.type === 'rusher') {
+          e.chargeDir = Math.cos(e.lockedAim) >= 0 ? 1 : -1; e.timer = e.pattern === 'leap' ? 0.68 : 0.36;
+          if (e.pattern === 'leap') { e.vy = -740; e.grounded = false; e.airDashTime = 0.40; e.airDashDir = e.chargeDir; e.jumpCooldown = 1.2; }
+        }
         else if (e.type === 'smg') { e.burstLeft = 5; e.shotTimer = 0; e.timer = 0.68; }
         else { this.enemyShot(e, e.lockedAim, { count: e.type === 'shotgun' ? 5 : e.type === 'heavy' ? 3 : 1, spread: e.type === 'shotgun' ? 0.5 : e.type === 'heavy' ? 0.16 : 0, speed: e.type === 'heavy' ? 310 : 360 }); e.timer = 0.12; }
       }
     } else if (e.state === 'attack') {
-      e.vx = e.type === 'rusher' ? e.chargeDir * 530 : 0;
+      e.vx = e.type === 'rusher' ? e.chargeDir * (e.pattern === 'leap' ? (e.airDashTime > 0 ? 660 : 420) : 620) : 0;
       if (e.type === 'rusher' && !e.attackHit && Math.abs(dx) < 44 && Math.abs(p.y - e.y) < 55) { this.damagePlayer(e.damage); e.attackHit = true; }
       if (e.type === 'smg') { e.shotTimer -= dt; if (e.shotTimer <= 0 && e.burstLeft > 0) { this.enemyShot(e, e.lockedAim + (this.rng() - 0.5) * 0.12, { speed: 380 }); e.burstLeft--; e.shotTimer = 0.13; } }
       if (e.timer <= 0) { e.state = 'recover'; e.timer = e.interval; e.vx = 0; }
     } else if (e.state === 'recover') { e.vx = 0; if (e.timer <= 0) { e.state = 'idle'; e.timer = 0.15; } }
     // Chase enemies can jump low cover and follow players off ledges.
-    if (e.grounded && e.vx !== 0 && this.room.covers.some(c => c.hp > 0 && Math.abs(c.x + c.w / 2 - e.x) < c.w / 2 + e.w / 2 + 12 && e.y > c.y + 5)) e.vy = -610;
+    if (e.type !== 'rusher' && e.grounded && e.vx !== 0 && this.room.covers.some(c => c.hp > 0 && Math.abs(c.x + c.w / 2 - e.x) < c.w / 2 + e.w / 2 + 12 && e.y > c.y + 5)) e.vy = -610;
     e.animation += Math.abs(e.vx) * dt / 40; this.moveActor(e, dt);
   }
   updateBoss(e, dt, dx, dist) {
@@ -2553,7 +2895,7 @@ class Game {
     this.room.cleared = false; this.room.rewardTaken = false; this.room.wave = 1; this.room.totalWaves = this.room.boss ? 1 : 3;
     this.player.x = 150; this.player.y = GROUND; this.player.vx = this.player.vy = 0; this.player.invuln = 1; this.camera.x = 0; this.waveDelay = 0;
     this.player.rollTime = 0; this.player.rollCooldown = 0; this.player.jumpBuffer = 0; this.player.grounded = true; this.player.coyote = 0.1;
-    Object.assign(this.player, { crouching: false, h: 58, vault: null, vaultTime: 0, vaultCooldown: 0, sheltered: false, maintenanceBlocked: false });
+    Object.assign(this.player, { crouching: false, h: 58, vault: null, vaultTime: 0, vaultCooldown: 0, sheltered: false, maintenanceBlocked: false, motionTime: 0, landingTime: 0, rollTotal: 0.28, knockbackTime: 0, knockbackX: 0, wireCooldown: 0 });
     for (const weapon of this.player.weapons) weapon.maintenance = 0;
     this.weather = { intensity: 0, target: 0, timer: 7 + this.weatherRng() * 8, elapsed: 0, kindlabel: this.room.weatherAllowed ? '비 그침' : '실내 · 비 없음' };
     this.spawnWave();
@@ -2571,7 +2913,7 @@ class Game {
         const existing = p.weapons.find(w => w.id === pickup.weaponId);
         if (existing) {
           existing.ammo = Math.min(this.magazine(existing.id), Math.max(existing.ammo, incoming.ammo)); existing.reload = 0;
-          existing.durability = Math.max(existing.durability, incoming.durability); existing.wetness = Math.min(existing.wetness, incoming.wetness);
+          existing.durability = Math.max(existing.durability, incoming.durability);
           existing.jammed = existing.jammed && incoming.jammed; if (!existing.jammed) { existing.jamReason = ''; existing.clearProgress = 0; }
           this.notify(`${WEAPONS[existing.id].name} · 탄약과 양호한 부품 확보`);
         }
@@ -2754,11 +3096,11 @@ class GameUI {
       const controls = [
         ['좌우 이동', ['A', 'D']], ['점프', ['Space']], ['조준', ['마우스 이동']], ['사격', ['좌클릭 유지']],
         ['재장전', ['R']], ['회피 구르기', ['Shift']], ['무기 교체', ['Q']], ['슬로모션', ['우클릭 유지']],
-        ['웅크리기', ['C 유지']], ['낮은 담 · 상자 넘기', ['F']],
-        ['총기 고장 해제', ['R 5회 연타']], ['총기 정비', ['R 1.4초 유지']],
+        ['웅크리기', ['C 유지']], ['상자 · 바리케이드 넘기', ['F']],
+        ['총기 고장 해제', ['R 5회 연타']], ['총기 점검', ['R 1.4초 유지']],
         ['획득 · 출구', ['E']], ['일시정지', ['Esc']],
       ];
-      body.innerHTML = `<div class="controls-grid">${controls.map(([label, keys]) => `<div class="control-row"><span>${label}</span><span class="control-keys">${keys.map(key => `<kbd>${key}</kbd>`).join('')}</span></div>`).join('')}</div><div class="control-tip"><b>우클릭 + 좌클릭을 함께 누르면 슬로모션 중 사격합니다.</b> 이동과 조준은 독립적입니다. C로 상자 뒤에 숨고, 가까운 낮은 장애물은 바라보는 쪽으로 F를 눌러 넘으세요.<br><b>총기 관리:</b> 내구도 15% 이하는 마모 경고, 0%에서 고장. 비에 젖음 85%가 되어도 고장납니다. 고장은 <b>R을 눌렀다 떼기 5회</b>로 해제합니다. 길게 누르기는 연타에 포함되지 않습니다. 고장이 없을 때 R을 1.4초 누르면 내구도 100%로 정비하고 일부 건조합니다. 지붕 아래나 비가 그쳤을 때 젖음이 줄어듭니다.<br>회피는 잠깐 무적입니다. 집중 게이지는 적 처치 시 회복됩니다. 무기는 최대 2개, 예비 탄약은 무제한입니다.<br><b>적 처치 → 강화 선택 → 오른쪽 출구에서 E.</b> 3개 구역, 9번째 방에서 보스와 맞서세요.</div>`;
+      body.innerHTML = `<div class="controls-grid">${controls.map(([label, keys]) => `<div class="control-row"><span>${label}</span><span class="control-keys">${keys.map(key => `<kbd>${key}</kbd>`).join('')}</span></div>`).join('')}</div><div class="control-tip"><p><b>우클릭 + 좌클릭으로 슬로모션 사격.</b> 이동과 조준은 독립적입니다. C로 낮게 숨고, 가까운 상자·얇은 바리케이드는 F로 넘으세요. <b>철조망은 F로 넘을 수 없고, 밟으면 0.5초마다 피해 3</b>을 받습니다. 점프로 피하세요.</p><p><b>기본 체력 50. 머리를 보호하세요.</b> 권총·리볼버는 적 머리 명중 시 피해 ×2, 다른 총은 헤드샷 보너스가 없습니다. 주인공도 머리에 총탄을 맞으면 피해 ×1.5입니다. 차량은 빨라질수록 충돌 피해와 밀려나는 힘이 커집니다. 뒤쪽 선로의 전동차는 충돌하지 않습니다.</p><p><b>총기 관리:</b> 내구도 15% 이하는 마모 경고, 0%에서 고장. 젖음 85%에서도 고장납니다. <b>R을 눌렀다 떼기 5회</b>로 작동을 복구합니다. 젖음은 그대로이며, 재고장까지 5초의 유예가 주어집니다. 길게 누르기는 연타가 아닙니다. 고장이 없을 때 <b>R을 1.4초 유지해 점검하면 내구도 100%, 젖음 0%</b>가 됩니다. 비가 그치거나 실내로 들어가도 젖음은 남습니다.</p><p>회피는 잠깐 무적입니다. 집중은 처치 시 회복됩니다. 무기는 최대 2개, 예비 탄약은 무제한입니다.<br><b>적 처치 → 강화 선택 → 오른쪽 출구에서 E.</b> 3개 구역, 9번째 방에서 보스와 맞서세요.</p></div>`;
     } else if (this.panel === 'settings') {
       this.text('panel-title', '밤의 감도');
       this.text('panel-overline', 'PREFERENCES / 설정');
@@ -2778,7 +3120,7 @@ class GameUI {
       const upgrades = UPGRADES.filter(upgrade => (this.game.player?.upgrades[upgrade.id] || 0) > 0);
       body.innerHTML = upgrades.length ? `<div class="upgrade-list">${upgrades.map(upgrade => `<div class="upgrade-item"><span class="upgrade-item-icon" aria-hidden="true">${escapeHTML(upgrade.icon)}</span><div class="upgrade-item-info"><div class="upgrade-item-header"><span>${escapeHTML(upgrade.name)}</span><span>${stackLabel(this.game.player.upgrades[upgrade.id], upgrade.maxStacks)}</span></div><p>${escapeHTML(upgrade.description)}</p></div></div>`).join('')}</div>` : '<div class="empty-upgrades"><span aria-hidden="true">◇</span><strong>아직, 빈손이다.</strong>전투 방을 클리어하면 무작위 강화 3개 중<br>하나를 선택할 수 있습니다.</div>';
       if (this.game.player?.weapons.length) {
-        body.innerHTML += `<div class="arsenal-heading">보유 무기 <span>최대 2개 · Q로 교체</span></div><div class="upgrade-list">${this.game.player.weapons.map((weapon, index) => { const def = WEAPONS[weapon.id]; return `<div class="upgrade-item arsenal-item"><span class="upgrade-item-icon" aria-hidden="true">${index + 1}</span><div class="upgrade-item-info"><div class="upgrade-item-header"><span>${escapeHTML(def.name)}</span><span>${index === this.game.player.weaponIndex ? '사용 중' : '보조 무기'}</span></div><p>${escapeHTML(def.tag)} · 피해 ${def.damage}${def.pellets > 1 ? ` × ${def.pellets}` : ''} · 재장전 ${def.reload}초<br>내구도 ${Math.round(weapon.durability ?? 100)}% · 젖음 ${Math.round(weapon.wetness ?? 0)}%${weapon.jammed ? ` · ${weapon.jamReason === 'rain' ? '침수' : '마모'} 고장 — R 5회 연타` : ''}<br>${escapeHTML(def.description)}</p></div></div>`; }).join('')}</div>`;
+        body.innerHTML += `<div class="arsenal-heading">보유 무기 <span>최대 2개 · Q로 교체</span></div><div class="upgrade-list">${this.game.player.weapons.map((weapon, index) => { const def = WEAPONS[weapon.id]; return `<div class="upgrade-item arsenal-item"><span class="upgrade-item-icon" aria-hidden="true">${index + 1}</span><div class="upgrade-item-info"><div class="upgrade-item-header"><span>${escapeHTML(def.name)}</span><span>${index === this.game.player.weaponIndex ? '사용 중' : '보조 무기'}</span></div><p>${escapeHTML(def.tag)} · 피해 ${def.damage}${def.pellets > 1 ? ` × ${def.pellets}` : ''} · 재장전 ${def.reload}초<br>${def.headMultiplier > 1 ? `머리 명중 ×${def.headMultiplier}` : '헤드샷 보너스 없음'} · 발사당 내구도 −${def.wear ?? 0}%<br>내구도 ${Math.round(weapon.durability ?? 100)}% · 젖음 ${Math.round(weapon.wetness ?? 0)}%${weapon.jammed ? ` · ${weapon.jamReason === 'rain' ? '침수' : '마모'} 고장 — R 5회 연타` : ''}<br>${escapeHTML(def.description)}</p></div></div>`; }).join('')}</div>`;
       }
     }
     body.scrollTop = 0;
@@ -2852,8 +3194,8 @@ class GameUI {
     this.text('area-name', `${String(game.zoneIndex + 1).padStart(2, '0')} / ${ZONES[game.zoneIndex].name}`);
     this.text('room-landmark', game.room.landmark?.name || game.room.name);
     const raining = (game.weather?.intensity || 0) > 0.05;
-    this.text('weather-status', `${game.weather?.kindlabel || (raining ? '비' : '비 그침')}${player.sheltered && raining ? ' · 지붕 아래' : ''}`);
-    this.node('weather-status').classList.toggle('sheltered', Boolean(player.sheltered && raining));
+    this.text('weather-status', game.weather?.kindlabel || (raining ? '비' : '비 그침'));
+    this.node('weather-status').classList.toggle('raining', raining);
     const alive = game.enemies.reduce((count, enemy) => count + !enemy.dead, 0);
     this.text('room-progress', `${game.roomIndex + 1} / 9 방 · ${game.room.boss ? '최후의 결전' : game.room.cleared ? '전투 완료' : `${game.room.wave || 1} / ${game.room.totalWaves || 3} 차 공세 · 적 ${alive}`}`);
     this.text('run-time', timeLabel(game.time));
@@ -2862,12 +3204,14 @@ class GameUI {
     this.text('dodge-text', player.rollTime > 0 ? '회피 중' : player.rollCooldown > 0 ? `회피 ${player.rollCooldown.toFixed(1)}초` : '회피 준비');
     this.node('dodge-status').className = player.rollCooldown > 0 ? 'dodge-wait' : 'dodge-ready';
     this.text('crouch-status', player.crouching ? '웅크림' : '웅크리기');
-    this.text('vault-status', player.vaultTime > 0 ? '넘는 중' : player.vaultCooldown > 0 ? `담 넘기 ${player.vaultCooldown.toFixed(1)}초` : '담 넘기');
+    const nearWire = (game.room.covers || []).some(cover => cover.kind === 'wire' && Math.abs(player.x - cover.x - cover.w / 2) < cover.w / 2 + 65 && Math.abs(player.y - cover.y - cover.h) < 75);
+    this.text('vault-status', player.vaultTime > 0 ? '넘는 중' : nearWire ? '철조망 · 불가' : player.vaultCooldown > 0 ? `담 넘기 ${player.vaultCooldown.toFixed(1)}초` : '담 넘기');
+    this.node('vault-control').classList.toggle('blocked', nearWire && player.vaultTime <= 0);
     this.node('crouch-control').classList.toggle('active', Boolean(player.crouching));
     this.node('vault-control').classList.toggle('active', player.vaultTime > 0);
     this.text('upgrade-count', Object.values(player.upgrades).reduce((sum, count) => sum + count, 0));
     this.text('weapon-name', def.name);
-    this.text('weapon-tag', def.tag);
+    this.text('weapon-tag', `${def.tag}${def.headMultiplier > 1 ? ' · 머리 ×2' : ''}`);
     this.text('ammo-current', String(weapon.ammo).padStart(2, '0'));
     this.text('ammo-max', game.magazine ? game.magazine(weapon.id) : def.magazine);
     this.fill('reload-fill', weapon.reload > 0 ? 1 - weapon.reload / weapon.reloadTotal : 0);
@@ -2885,15 +3229,16 @@ class GameUI {
     this.node('condition-panel').classList.toggle('maintaining', maintenance > 0);
     this.fill('service-fill', weapon.jammed ? clearing / 5 : maintenance / 1.4);
     this.visible('service-track', Boolean(weapon.jammed || maintenance > 0));
-    this.text('condition-status', weapon.jammed ? `${weapon.jamReason === 'rain' ? '침수' : '마모'} 고장 · R 연타 ${clearing} / 5` : maintenance > 0 ? `정비 ${Math.min(100, Math.floor(maintenance / 1.4 * 100))}% · R 유지` : durability <= 15 ? '마모 위험 · R 1.4초 정비' : wetness >= 65 ? '총기가 젖습니다 · 지붕으로' : durability < 99 ? 'R 1.4초 유지 · 총기 정비' : '총기 상태 양호');
+    this.text('condition-status', weapon.jammed ? `${weapon.jamReason === 'rain' ? '침수' : '마모'} 고장 · R 연타 ${clearing} / 5` : maintenance > 0 ? `점검 ${Math.min(100, Math.floor(maintenance / 1.4 * 100))}% · R 유지` : weapon.jamGrace > 0 && wetness >= 85 ? `재고장 ${weapon.jamGrace.toFixed(1)}초 · R 점검` : durability <= 15 ? '마모 위험 · R 유지 점검' : wetness > 0 ? '젖음 유지 · R 길게 점검' : durability < 99 ? 'R 1.4초 유지 · 총기 점검' : '총기 상태 양호');
     if (weapon.jammed) this.text('reload-text', '고장 · R 연타');
-    else if (maintenance > 0.25) this.text('reload-text', '현장 정비 중');
+    else if (maintenance > 0.25) this.text('reload-text', '총기 점검 중');
     this.visible('game-toast', game.toast.time > 0 && Boolean(game.toast.text));
     this.text('game-toast', game.toast.text || '');
     const pickup = game.pickups.find(item => Math.abs(item.x - player.x) < 90 && Math.abs(item.y - player.y) < 95);
     let notice = '';
     if (pickup?.type === 'weapon') notice = `E · ${WEAPONS[pickup.weaponId]?.tag || '무기'} ${player.weapons.length < 2 ? '획득' : '현재 무기와 교체'}`;
     else if (pickup?.type === 'health') notice = `E · 체력 ${pickup.amount} 회복`;
+    else if (nearWire) notice = '철조망 · F 사용 불가 / 점프로 피하세요';
     else if (game.room.cleared && game.room.rewardTaken) notice = Math.abs(player.x - game.room.exit.x) < 120 ? 'E · 다음 방으로' : '오른쪽 출구로 이동 →';
     else if (game.waveDelay > 0) notice = '다음 공세가 다가온다 · 재장전하세요';
     else if (game.time < 9) notice = 'C 웅크리기 · F 담 넘기 · 우클릭 + 좌클릭 집중 사격';
